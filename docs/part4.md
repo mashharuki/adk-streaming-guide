@@ -846,6 +846,10 @@ This parameter caps the total number of LLM invocations allowed per invocation c
 
 This parameter controls whether audio and video streams are persisted to ADK's session and artifact services for debugging, compliance, and quality assurance purposes.
 
+!!! warning "Migration Note: save_live_audio Deprecated"
+
+    **If you're using `save_live_audio`:** This parameter has been deprecated in favor of `save_live_blob`. ADK will automatically migrate `save_live_audio=True` to `save_live_blob=True` with a deprecation warning, but this compatibility layer will be removed in a future release. Update your code to use `save_live_blob` instead.
+
 Currently, **only audio is persisted** by ADK's implementation. When enabled, ADK persists audio streams to:
 
 - **[Session service](https://google.github.io/adk-docs/sessions/)**: Conversation history includes audio references
