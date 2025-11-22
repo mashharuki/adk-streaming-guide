@@ -133,7 +133,7 @@ Not all events yielded by `run_live()` are persisted to the ADK `Session`. When 
 
 These events are persisted to the ADK `Session` and available in session history:
 
-- **Audio Events with File Data**: Saved to ADK `Session` only if `RunConfig.save_live_model_audio_to_session` is `True`; audio data is aggregated into files in artifacts with `file_data` references
+- **Audio Events with File Data**: Saved to ADK `Session` only if `RunConfig.save_live_blob` is `True`; audio data is aggregated into files in artifacts with `file_data` references
 - **Usage Metadata Events**: Always saved to track token consumption across the ADK `Session`
 - **Non-Partial Transcription Events**: Final transcriptions are saved; partial transcriptions are not persisted
 - **Function Call and Response Events**: Always saved to maintain tool execution history
@@ -369,7 +369,7 @@ Both input and output audio data are aggregated into audio files and saved in th
 
 !!! note "Session Persistence"
 
-    To save audio events with file data to session history, enable `RunConfig.save_live_model_audio_to_session = True`. This allows audio conversations to be reviewed or replayed from persisted sessions.
+    To save audio events with file data to session history, enable `RunConfig.save_live_blob = True`. This allows audio conversations to be reviewed or replayed from persisted sessions.
 
 ### Metadata Events
 
