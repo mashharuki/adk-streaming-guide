@@ -221,6 +221,33 @@ sequenceDiagram
     Note over ADK,Gemini: Turn Detection: finish_reason
 ```
 
+!!! info "Progressive SSE Streaming (New in v1.19.0)"
+
+    ADK v1.19.0 introduced **progressive SSE streaming**, an experimental feature that enhances how SSE mode delivers streaming responses. When enabled, this feature improves response aggregation by:
+
+    **Key improvements:**
+
+    - **Content ordering preservation**: Maintains the original order of mixed content types (text, function calls, inline data)
+    - **Intelligent text merging**: Only merges consecutive text parts of the same type (regular text vs thought text)
+    - **Progressive delivery**: Marks all intermediate chunks as `partial=True`, with a single final aggregated response at the end
+    - **Deferred function execution**: Skips executing function calls in partial events, only executing them in the final aggregated event to avoid duplicate executions
+
+    **Enabling the feature:**
+
+    This is an experimental (WIP stage) feature disabled by default. Enable it via environment variable:
+
+    ```bash
+    export ADK_FEATURE_PROGRESSIVE_SSE_STREAMING=true
+    ```
+
+    **When to use:**
+
+    - You're using `StreamingMode.SSE` and need better handling of mixed content types (text + function calls)
+    - Your responses include thought text (extended thinking) mixed with regular text
+    - You want to ensure function calls execute only once after complete response aggregation
+
+    **Note:** This feature only affects `StreamingMode.SSE`. It does not apply to `StreamingMode.BIDI` (the focus of this guide), which uses the Live API's native bidirectional protocol.
+
 ### When to Use Each Mode
 
 Your choice between BIDI and SSE depends on your application requirements and the interaction patterns you need to support. Here's a practical guide to help you choose:
