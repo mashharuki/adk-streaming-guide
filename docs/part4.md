@@ -237,7 +237,7 @@ sequenceDiagram
     This is an experimental (WIP stage) feature disabled by default. Enable it via environment variable:
 
     ```bash
-    export ADK_FEATURE_PROGRESSIVE_SSE_STREAMING=true
+    export ADK_ENABLE_PROGRESSIVE_SSE_STREAMING=1
     ```
 
     **When to use:**
@@ -562,16 +562,6 @@ run_config = RunConfig(
         trigger_tokens=100000,  # Start compression at ~78% of 128k context
         sliding_window=types.SlidingWindow(
             target_tokens=80000  # Compress to ~62% of context, preserving recent turns
-        )
-    )
-)
-
-# For gemini-live-2.5-flash (32k context window on Vertex AI)
-run_config = RunConfig(
-    context_window_compression=types.ContextWindowCompressionConfig(
-        trigger_tokens=25000,  # Start compression at ~78% of 32k context
-        sliding_window=types.SlidingWindow(
-            target_tokens=20000  # Compress to ~62% of context
         )
     )
 )
@@ -985,7 +975,7 @@ run_config = RunConfig(
 
 ADK validates CFC compatibility at session initialization and will raise an error if the model is unsupported:
 
-- ✅ **Supported**: `gemini-2.x` models (e.g., `gemini-2.5-flash-native-audio-preview-09-2025`, `gemini-2.0-flash-live-001`)
+- ✅ **Supported**: `gemini-2.x` models (e.g., `gemini-2.5-flash-native-audio-preview-09-2025`)
 - ❌ **Not supported**: `gemini-1.5-x` models
 - **Validation**: ADK checks that the model name starts with `gemini-2` when `support_cfc=True` ([`runners.py:1200-1203`](https://github.com/google/adk-python/blob/main/src/google/adk/runners.py#L1200-L1203))
 - **Code executor**: ADK automatically injects `BuiltInCodeExecutor` when CFC is enabled for safe parallel tool execution
