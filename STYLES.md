@@ -189,6 +189,51 @@ This approach eliminates indentation issues and improves readability for code-he
 
 ## 3. Sample Code Style
 
+### 3.0 Source Code Formatting (src/ directory)
+
+All Python code under `/src` (including the bidi-demo application) must be formatted and linted using the following tools:
+
+**Required Tools:**
+
+- **black**: Code formatter (line length 88)
+- **isort**: Import sorter (compatible with black)
+- **flake8**: Linter for style and error checking
+
+**Running the formatters:**
+
+```bash
+# Format code with black and isort
+cd src/bidi-demo
+black .
+isort .
+
+# Check for linting issues
+flake8 .
+```
+
+**Configuration:**
+
+The tools should be configured to work together. Recommended `pyproject.toml` settings:
+
+```toml
+[tool.black]
+line-length = 88
+
+[tool.isort]
+profile = "black"
+line_length = 88
+```
+
+**Pre-commit check:**
+
+Before committing changes to `/src`, ensure:
+
+- [ ] `black --check .` passes (no formatting changes needed)
+- [ ] `isort --check .` passes (imports properly sorted)
+- [ ] `flake8 .` passes (no linting errors)
+
+**Note:** Code samples in documentation (docs/*.md) should follow the same style for consistency, but are not automatically checked by these tools.
+
 ### 3.1 Code Block Formatting
 - **Language tags**: All code blocks must specify language: ```python, ```bash, ```json, ```javascript
   - For Mermaid diagrams: ```mermaid
