@@ -56,7 +56,7 @@ end
 
 The simplest way to consume events from `run_live()` is to iterate over the async generator with a for-loop:
 
-```python title='Demo implementation: <a href="https://github.com/google/adk-samples/blob/main/python/agents/bidi-demo/app/main.py#L182-L190" target="_blank">main.py:182-190</a>'
+```python title='Demo implementation: <a href="https://github.com/google/adk-samples/blob/main/python/agents/bidi-demo/app/main.py#L189-L197" target="_blank">main.py:189-197</a>'
 async for event in runner.run_live(
     user_id=user_id,
     session_id=session_id,
@@ -831,7 +831,7 @@ This provides a simple one-liner to convert ADK events into JSON format that can
 
 The `model_dump_json()` method serializes an `Event` object to a JSON string:
 
-```python title='Demo implementation: <a href="https://github.com/google/adk-samples/blob/main/python/agents/bidi-demo/app/main.py#L178-L191" target="_blank">main.py:178-191</a>'
+```python title='Demo implementation: <a href="https://github.com/google/adk-samples/blob/main/python/agents/bidi-demo/app/main.py#L183-L198" target="_blank">main.py:183-198</a>'
 async def downstream_task() -> None:
     """Receives Events from run_live() and sends to WebSocket."""
     async for event in runner.run_live(
@@ -1081,7 +1081,7 @@ You don't need to handle the execution yourself—ADK does it automatically. You
 
 !!! note "Learn More"
 
-    The bidi-demo sends all events (including function calls and responses) directly to the WebSocket client without server-side filtering. This allows the client to observe tool execution in real-time through the event stream. See the downstream task in [`main.py:178-191`](https://github.com/google/adk-samples/blob/main/python/agents/bidi-demo/app/main.py#L178-L191)
+    The bidi-demo sends all events (including function calls and responses) directly to the WebSocket client without server-side filtering. This allows the client to observe tool execution in real-time through the event stream. See the downstream task in [`main.py:183-198`](https://github.com/google/adk-samples/blob/main/python/agents/bidi-demo/app/main.py#L183-L198)
 
 ### Long-Running and Streaming Tools
 

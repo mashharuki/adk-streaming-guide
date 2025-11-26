@@ -452,7 +452,7 @@ The ADK [Session](https://google.github.io/adk-docs/sessions/session/) manages c
 
 To create a `Session`, or get an existing one for a specified `session_id`, every ADK application needs to have a [SessionService](https://google.github.io/adk-docs/sessions/session/#managing-sessions-with-a-sessionservice). For development purpose, ADK provides a simple `InMemorySessionService` that will lose the `Session` state when the application shuts down.
 
-```python title='Demo implementation: <a href="https://github.com/google/adk-samples/blob/main/python/agents/bidi-demo/app/main.py#L46" target="_blank">main.py:46</a>'
+```python title='Demo implementation: <a href="https://github.com/google/adk-samples/blob/main/python/agents/bidi-demo/app/main.py#L48" target="_blank">main.py:48</a>'
 from google.adk.sessions import InMemorySessionService
 
 # Define your session service
@@ -488,7 +488,7 @@ All three provide session persistence capabilities—choose based on your infras
 
 The [Runner](https://google.github.io/adk-docs/runtime/) provides the runtime for the `Agent`. It manages the conversation flow, coordinates tool execution, handles events, and integrates with session storage. You create one runner instance at application startup and reuse it for all streaming sessions.
 
-```python title='Demo implementation: <a href="https://github.com/google/adk-samples/blob/main/python/agents/bidi-demo/app/main.py#L34" target="_blank">main.py:34,49-53</a>'
+```python title='Demo implementation: <a href="https://github.com/google/adk-samples/blob/main/python/agents/bidi-demo/app/main.py#L34" target="_blank">main.py:34,51</a>'
 from google.adk.runners import Runner
 
 APP_NAME = "bidi-demo"
@@ -544,7 +544,7 @@ This design enables scenarios like:
 
 The recommended production pattern is to check if a session exists first, then create it only if needed. This approach safely handles both new sessions and conversation resumption:
 
-```python title='Demo implementation: <a href="https://github.com/google/adk-samples/blob/main/python/agents/bidi-demo/app/main.py#L110-L121" target="_blank">main.py:110-121</a>'
+```python title='Demo implementation: <a href="https://github.com/google/adk-samples/blob/main/python/agents/bidi-demo/app/main.py#L119-L125" target="_blank">main.py:119-125</a>'
 # Get or create session (handles both new sessions and reconnections)
 session = await session_service.get_session(
     app_name=APP_NAME,
@@ -571,7 +571,7 @@ This pattern works correctly in all scenarios:
 
 [RunConfig](part4.md) defines the streaming behavior for this specific session—which modalities to use (text or audio), whether to enable transcription, voice activity detection, proactivity, and other advanced features.
 
-```python title='Demo implementation: <a href="https://github.com/google/adk-samples/blob/main/python/agents/bidi-demo/app/main.py#L89-L95" target="_blank">main.py:89-95</a>'
+```python title='Demo implementation: <a href="https://github.com/google/adk-samples/blob/main/python/agents/bidi-demo/app/main.py#L92-L99" target="_blank">main.py:92-99</a>'
 from google.adk.agents.run_config import RunConfig, StreamingMode
 from google.genai import types
 
@@ -592,7 +592,7 @@ run_config = RunConfig(
 
 `LiveRequestQueue` is the communication channel for sending messages to the agent during streaming. It's a thread-safe async queue that buffers user messages (text content, audio blobs, activity signals) for orderly processing.
 
-```python title='Demo implementation: <a href="https://github.com/google/adk-samples/blob/main/python/agents/bidi-demo/app/main.py#L123" target="_blank">main.py:123</a>'
+```python title='Demo implementation: <a href="https://github.com/google/adk-samples/blob/main/python/agents/bidi-demo/app/main.py#L127" target="_blank">main.py:127</a>'
 from google.adk.agents.live_request_queue import LiveRequestQueue
 
 live_request_queue = LiveRequestQueue()
@@ -614,7 +614,7 @@ Once the streaming loop is running, you can send messages to the agent and recei
 
 Use `LiveRequestQueue` methods to send different types of messages to the agent during the streaming session:
 
-```python title='Demo implementation: <a href="https://github.com/google/adk-samples/blob/main/python/agents/bidi-demo/app/main.py#L136-L176" target="_blank">main.py:136-176</a>'
+```python title='Demo implementation: <a href="https://github.com/google/adk-samples/blob/main/python/agents/bidi-demo/app/main.py#L133-L181" target="_blank">main.py:133-181</a>'
 from google.genai import types
 
 # Send text content
@@ -637,7 +637,7 @@ See [Part 2: Sending messages with LiveRequestQueue](part2.md) for detailed API 
 
 The `run_live()` async generator continuously yields `Event` objects as the agent processes input and generates responses. Each event represents a discrete occurrence—partial text generation, audio chunks, tool execution, transcription, interruption, or turn completion.
 
-```python title='Demo implementation: <a href="https://github.com/google/adk-samples/blob/main/python/agents/bidi-demo/app/main.py#L178-L190" target="_blank">main.py:178-190</a>'
+```python title='Demo implementation: <a href="https://github.com/google/adk-samples/blob/main/python/agents/bidi-demo/app/main.py#L183-L198" target="_blank">main.py:183-198</a>'
 async for event in runner.run_live(
     user_id=user_id,
     session_id=session_id,
@@ -660,7 +660,7 @@ When the streaming session should end (user disconnects, conversation completes,
 
 Send a close signal through the queue to terminate the streaming loop:
 
-```python title='Demo implementation: <a href="https://github.com/google/adk-samples/blob/main/python/agents/bidi-demo/app/main.py#L213" target="_blank">main.py:213</a>'
+```python title='Demo implementation: <a href="https://github.com/google/adk-samples/blob/main/python/agents/bidi-demo/app/main.py#L217" target="_blank">main.py:217</a>'
 live_request_queue.close()
 ```
 
@@ -806,7 +806,7 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
 
 The upstream task continuously receives messages from the WebSocket client and forwards them to the `LiveRequestQueue`. This enables the user to send messages to the agent at any time, even while the agent is generating a response.
 
-```python title='Demo implementation: <a href="https://github.com/google/adk-samples/blob/main/python/agents/bidi-demo/app/main.py#L129-L176" target="_blank">main.py:129-176</a>'
+```python title='Demo implementation: <a href="https://github.com/google/adk-samples/blob/main/python/agents/bidi-demo/app/main.py#L133-L181" target="_blank">main.py:133-181</a>'
 async def upstream_task() -> None:
     """Receives messages from WebSocket and sends to LiveRequestQueue."""
     try:
@@ -822,7 +822,7 @@ async def upstream_task() -> None:
 
 The downstream task continuously receives `Event` objects from `run_live()` and sends them to the WebSocket client. This streams the agent's responses, tool executions, transcriptions, and other events to the user in real-time.
 
-```python title='Demo implementation: <a href="https://github.com/google/adk-samples/blob/main/python/agents/bidi-demo/app/main.py#L178-L190" target="_blank">main.py:178-190</a>'
+```python title='Demo implementation: <a href="https://github.com/google/adk-samples/blob/main/python/agents/bidi-demo/app/main.py#L183-L198" target="_blank">main.py:183-198</a>'
 async def downstream_task() -> None:
     """Receives Events from run_live() and sends to WebSocket."""
     async for event in runner.run_live(
@@ -840,7 +840,7 @@ async def downstream_task() -> None:
 
 Both tasks run concurrently using `asyncio.gather()`, enabling true Bidi-streaming. The `try/finally` block ensures `LiveRequestQueue.close()` is called even if exceptions occur, minimizing the session resource usage.
 
-```python title='Demo implementation: <a href="https://github.com/google/adk-samples/blob/main/python/agents/bidi-demo/app/main.py#L195-L213" target="_blank">main.py:195-213</a>'
+```python title='Demo implementation: <a href="https://github.com/google/adk-samples/blob/main/python/agents/bidi-demo/app/main.py#L200-L217" target="_blank">main.py:200-217</a>'
 try:
     await asyncio.gather(
         upstream_task(),

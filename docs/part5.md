@@ -18,7 +18,7 @@ Before calling `send_realtime()`, ensure your audio data is already in the corre
 
 ADK does not perform audio format conversion. Sending audio in incorrect formats will result in poor quality or errors.
 
-```python title='Demo implementation: <a href="https://github.com/google/adk-samples/blob/main/python/agents/bidi-demo/app/main.py#L141-L145" target="_blank">main.py:141-145</a>'
+```python title='Demo implementation: <a href="https://github.com/google/adk-samples/blob/main/python/agents/bidi-demo/app/main.py#L145-L148" target="_blank">main.py:145-148</a>'
 audio_blob = types.Blob(
     mime_type="audio/pcm;rate=16000",
     data=audio_data
@@ -212,7 +212,7 @@ async for event in runner.run_live(
 
 The bidi-demo uses a different architectural approach: instead of processing audio on the server, it forwards all events (including audio data) to the WebSocket client and handles audio playback in the browser. This pattern separates concerns—the server focuses on ADK event streaming while the client handles media playback using Web Audio API.
 
-```python title='Demo implementation: <a href="https://github.com/google/adk-samples/blob/main/python/agents/bidi-demo/app/main.py#L182-L190" target="_blank">main.py:182-190</a>'
+```python title='Demo implementation: <a href="https://github.com/google/adk-samples/blob/main/python/agents/bidi-demo/app/main.py#L189-L197" target="_blank">main.py:189-197</a>'
 # The bidi-demo forwards all events (including audio) to the WebSocket client
 async for event in runner.run_live(
     user_id=user_id,
@@ -406,7 +406,7 @@ Both images and video in ADK Bidi-streaming are processed as JPEG frames. Rather
 - **Frame rate**: 1 frame per second (1 FPS) recommended maximum
 - **Resolution**: 768x768 pixels (recommended)
 
-```python title='Demo implementation: <a href="https://github.com/google/adk-samples/blob/main/python/agents/bidi-demo/app/main.py#L161-L176" target="_blank">main.py:161-176</a>'
+```python title='Demo implementation: <a href="https://github.com/google/adk-samples/blob/main/python/agents/bidi-demo/app/main.py#L166-L181" target="_blank">main.py:166-181</a>'
 # Decode base64 image data
 image_data = base64.b64decode(json_message["data"])
 mime_type = json_message.get("mimeType", "image/jpeg")
@@ -668,6 +668,35 @@ DEMO_AGENT_MODEL=gemini-2.5-flash-native-audio-preview-09-2025
 # DEMO_AGENT_MODEL=gemini-live-2.5-flash-preview-native-audio-09-2025
 ```
 
+!!! note "Environment Variable Loading Order"
+
+    When using `.env` files with `python-dotenv`, you must call `load_dotenv()` **before** importing any modules that read environment variables. Otherwise, `os.getenv()` will return `None` and fall back to the default value, ignoring your `.env` configuration.
+
+    **Correct order in `main.py`:**
+
+    ```python
+    from dotenv import load_dotenv
+    from pathlib import Path
+
+    # Load .env file BEFORE importing agent
+    load_dotenv(Path(__file__).parent / ".env")
+
+    # Now safe to import modules that use environment variables
+    from google_search_agent.agent import agent
+    ```
+
+    **Incorrect order (will not work):**
+
+    ```python
+    from dotenv import load_dotenv
+    from google_search_agent.agent import agent  # Agent reads env var here
+
+    # Too late! Agent already initialized with default model
+    load_dotenv(Path(__file__).parent / ".env")
+    ```
+
+    This is a Python import behavior: when you import a module, its top-level code executes immediately. If your agent module calls `os.getenv("DEMO_AGENT_MODEL")` at import time, the `.env` file must already be loaded.
+
 **Selecting the right model:**
 
 1. **Choose platform**: Decide between Gemini Live API (public) or Vertex AI Live API (enterprise)
@@ -675,7 +704,7 @@ DEMO_AGENT_MODEL=gemini-2.5-flash-native-audio-preview-09-2025
    - Native Audio for natural conversational AI with advanced features
    - Half-Cascade for production reliability with tool execution
 3. **Check current availability**: Refer to the model tables above and official documentation
-4. **Configure environment variable**: Set `DEMO_AGENT_MODEL` in your `.env` file (see [`agent.py:11-16`](https://github.com/google/adk-samples/blob/main/python/agents/bidi-demo/app/google_search_agent/agent.py#L11-L16) and [`main.py:83-96`](https://github.com/google/adk-samples/blob/main/python/agents/bidi-demo/app/main.py#L83-L96))
+4. **Configure environment variable**: Set `DEMO_AGENT_MODEL` in your `.env` file (see [`agent.py:11-16`](https://github.com/google/adk-samples/blob/main/python/agents/bidi-demo/app/google_search_agent/agent.py#L11-L16) and [`main.py:87-116`](https://github.com/google/adk-samples/blob/main/python/agents/bidi-demo/app/main.py#L87-L116))
 
 ### Live API Models Compatibility and Availability
 

@@ -73,7 +73,7 @@ graph LR
 
 The `send_content()` method sends text messages in turn-by-turn mode, where each message represents a discrete conversation turn. This signals a complete turn to the model, triggering immediate response generation.
 
-```python title='Demo implementation: <a href="https://github.com/google/adk-samples/blob/main/python/agents/bidi-demo/app/main.py#L157-L158" target="_blank">main.py:157-158</a>'
+```python title='Demo implementation: <a href="https://github.com/google/adk-samples/blob/main/python/agents/bidi-demo/app/main.py#L158-L163" target="_blank">main.py:158-163</a>'
 content = types.Content(parts=[types.Part(text=json_message["text"])])
 live_request_queue.send_content(content)
 ```
@@ -103,7 +103,7 @@ For Live API, multimodal inputs (audio/video) use different mechanisms (see `sen
 
 The `send_realtime()` method sends binary data streams—primarily audio, image and video—flow through the `Blob` type, which handles transmission in realtime mode. Unlike text content that gets processed in turn-by-turn mode, blobs are designed for continuous streaming scenarios where data arrives in chunks. You provide raw bytes, and Pydantic automatically handles base64 encoding during JSON serialization for safe network transmission (configured in `LiveRequest.model_config`). The MIME type helps the model understand the content format.
 
-```python title='Demo implementation: <a href="https://github.com/google/adk-samples/blob/main/python/agents/bidi-demo/app/main.py#L141-L145" target="_blank">main.py:141-145</a>'
+```python title='Demo implementation: <a href="https://github.com/google/adk-samples/blob/main/python/agents/bidi-demo/app/main.py#L145-L148" target="_blank">main.py:145-148</a>'
 audio_blob = types.Blob(
     mime_type="audio/pcm;rate=16000",
     data=audio_data
@@ -163,7 +163,7 @@ The `close` signal provides graceful termination semantics for streaming session
 
 See [Part 4: Understanding RunConfig](part4.md#streamingmode-bidi-or-sse) for detailed comparison and when to use each mode.
 
-```python title='Demo implementation: <a href="https://github.com/google/adk-samples/blob/main/python/agents/bidi-demo/app/main.py#L195-L213" target="_blank">main.py:195-213</a>'
+```python title='Demo implementation: <a href="https://github.com/google/adk-samples/blob/main/python/agents/bidi-demo/app/main.py#L200-L217" target="_blank">main.py:200-217</a>'
 try:
     logger.debug("Starting asyncio.gather for upstream and downstream tasks")
     await asyncio.gather(
@@ -199,7 +199,7 @@ Understanding how `LiveRequestQueue` handles concurrency is essential for buildi
 
 **Why synchronous send methods?** Convenience and simplicity. You can call them from anywhere in your async code without `await`:
 
-```python title='Demo implementation: <a href="https://github.com/google/adk-samples/blob/main/python/agents/bidi-demo/app/main.py#L129-L158" target="_blank">main.py:129-158</a>'
+```python title='Demo implementation: <a href="https://github.com/google/adk-samples/blob/main/python/agents/bidi-demo/app/main.py#L133-L163" target="_blank">main.py:133-163</a>'
 async def upstream_task() -> None:
     """Receives messages from WebSocket and sends to LiveRequestQueue."""
     while True:
