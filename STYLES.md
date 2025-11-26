@@ -64,13 +64,14 @@ Each part should follow this standard structure where applicable:
   - MUST include "Source reference: " prefix
   - Use single quotes for title attribute: `title='Source reference: <a href="..." target="_blank">file:lines</a>'`
   - The link opens in a new window with `target="_blank"`
-  - Example: ` ```python title='Source reference: <a href="https://github.com/google/adk-python/blob/main/src/google/adk/runners.py#L746-L775" target="_blank">runners.py:746-775</a>' `
+  - **MUST use commit hash links** (permalinks) instead of `main` branch to prevent broken links when code changes
+  - Example: ` ```python title='Source reference: <a href="https://github.com/google/adk-python/blob/abc1234def5678/src/google/adk/runners.py#L746-L775" target="_blank">runners.py:746-775</a>' `
 - **Demo references**: Add as code block title attribute using HTML anchor tags that open in new windows
   - MUST include "Demo implementation: " prefix
   - Use single quotes for title attribute: `title='Demo implementation: <a href="..." target="_blank">file:lines</a>'`
-  - Always use the public GitHub repository link `https://github.com/google/adk-samples/blob/main/python/agents/bidi-demo/...`
+  - **MUST use commit hash links** (permalinks) instead of `main` branch to prevent broken links when code changes
   - Include line numbers in the link for precise reference
-  - Example: ` ```python title='Demo implementation: <a href="https://github.com/google/adk-samples/blob/main/python/agents/bidi-demo/app/main.py#L129-L158" target="_blank">main.py:129-158</a>' `
+  - Example: ` ```python title='Demo implementation: <a href="https://github.com/google/adk-samples/blob/abc1234def5678/python/agents/bidi-demo/app/main.py#L129-L158" target="_blank">main.py:129-158</a>' `
 - **Learn more**: Use `!!! note "Learn More"` boxes or subsections instead of blockquotes
 - **Navigation links** (required for multi-part documentation series):
   - Every part in a series MUST include navigation links at the end
@@ -279,7 +280,7 @@ For code taken from ADK source or the bidi-demo application, **ALWAYS** add the 
 **Demo Implementation Pattern:**
 
 ```markdown
-\`\`\`python title='Demo implementation: <a href="https://github.com/google/adk-samples/blob/main/python/agents/bidi-demo/app/main.py#L141-L145" target="_blank">main.py:141-145</a>'
+\`\`\`python title='Demo implementation: <a href="https://github.com/google/adk-samples/blob/abc1234def5678/python/agents/bidi-demo/app/main.py#L141-L145" target="_blank">main.py:141-145</a>'
 audio_blob = types.Blob(
     mime_type="audio/pcm;rate=16000",
     data=audio_data
@@ -291,7 +292,7 @@ live_request_queue.send_realtime(audio_blob)
 **Source Reference Pattern:**
 
 ```markdown
-\`\`\`python title='Source reference: <a href="https://github.com/google/adk-python/blob/main/src/google/adk/runners.py#L746-L775" target="_blank">runners.py:746-775</a>'
+\`\`\`python title='Source reference: <a href="https://github.com/google/adk-python/blob/abc1234def5678/src/google/adk/runners.py#L746-L775" target="_blank">runners.py:746-775</a>'
 async for event in runner.run_live(
     user_id=user_id,
     session_id=session_id,
@@ -327,9 +328,16 @@ run_config = RunConfig(
 - **Do NOT add captions** like "**Demo Implementation:**" before code blocks with title attributes - the title serves as the caption
 - **Always include** `target="_blank"` in HTML anchor tags to open links in new windows/tabs
 - **Always include line numbers** in source/demo references for precise navigation (`#L123-L456`)
-- **Use full GitHub URLs** with line number anchors:
-  - Demo: `https://github.com/google/adk-samples/blob/main/python/agents/bidi-demo/...`
-  - Source: `https://github.com/google/adk-python/blob/main/src/google/adk/...`
+- **MUST use commit hash links** (permalinks) instead of branch names like `main`:
+  - Links using `main` branch break when code is modified, reformatted, or refactored
+  - Commit hash links are permanent and always point to the exact code referenced
+  - Format: `https://github.com/owner/repo/blob/{commit_hash}/path/to/file.py#L123-L456`
+  - Example: `https://github.com/google/adk-python/blob/a1b2c3d4e5f6/src/google/adk/runners.py#L746-L775`
+- **How to get commit hash links**:
+  - On GitHub, navigate to the file and click on the line number(s) to highlight them
+  - Press `y` to convert the URL from branch name to commit hash (permalink)
+  - Or click "..." menu → "Copy permalink"
+  - The URL will change from `.../blob/main/...` to `.../blob/{40-char-hash}/...`
 - **Only add title attributes** for code directly copied from source; omit for illustrative examples
 
 ### 3.4 Code Consistency
