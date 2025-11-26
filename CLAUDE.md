@@ -93,6 +93,7 @@ This repository provides specialized knowledge through skill configuration files
 - **`google-adk`** (`.claude/skills/google-adk/SKILL.md`): Agent Development Kit (ADK) expertise for Python SDK and API reference
 - **`gemini-live-api`** (`.claude/skills/gemini-live-api/SKILL.md`): Google Gemini Live API documentation and guides
 - **`vertexai-live-api`** (`.claude/skills/vertexai-live-api/SKILL.md`): Google Cloud Vertex AI Live API documentation
+- **`code-lint`** (`.claude/skills/code-lint/SKILL.md`): Python code linter and formatter using black, isort, and flake8
 - **`docs-lint`** (`.claude/skills/docs-lint/SKILL.md`): Documentation consistency and style reviewer
 - **`mkdocs-lint`** (`.claude/skills/mkdocs-lint/SKILL.md`): MkDocs rendering linter that identifies and fixes critical rendering issues
 
@@ -104,6 +105,7 @@ To activate a skill, reference it directly:
 - **For bidirectional streaming**: Say "use bidi skill" or "access the bidi skill"
 - **For Gemini Live API**: Say "use gemini-live-api skill"
 - **For Vertex AI Live API**: Say "use vertexai-live-api skill"
+- **For Python code formatting**: Say "use code-lint skill"
 - **For documentation review**: Say "use docs-lint skill"
 - **For MkDocs rendering check**: Say "use mkdocs-lint skill"
 
@@ -191,6 +193,26 @@ find docs/assets/ -type f ! -name "agent-development-kit.png" ! -name ".*" -exec
 6. Include cross-references to related sections
 7. Use the docs-lint skill to review changes
 
+### Lint the code
+
+Before committing changes to Python code under `/src`, run the code-lint skill:
+
+```bash
+# Use the code-lint skill to:
+# - Check and fix formatting with black
+# - Check and fix import sorting with isort
+# - Check for linting issues with flake8
+```
+
+Or run the tools directly:
+
+```bash
+cd src/bidi-demo
+black .
+isort .
+flake8 .
+```
+
 ### Modifying Demo Application
 
 1. The demo app follows the 4-phase lifecycle pattern
@@ -199,6 +221,7 @@ find docs/assets/ -type f ! -name "agent-development-kit.png" ! -name ".*" -exec
 4. Always close `LiveRequestQueue` in the `finally` block
 5. Test with both text and audio modalities
 6. Verify WebSocket connection handling
+7. Run code-lint skill before committing (see "Lint the code" above)
 
 ### Running Documentation Reviews
 
