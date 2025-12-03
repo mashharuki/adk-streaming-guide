@@ -372,6 +372,30 @@ The modality detection is automatic based on the model name. Native audio models
 - Check API quota limits in console
 - Ensure billing is enabled (for Vertex AI)
 
+## Development
+
+### Code Formatting
+
+This project uses black, isort, and flake8 for code formatting and linting. Configuration is inherited from the repository root.
+
+```bash
+# Format code with black
+black .
+
+# Sort imports with isort
+isort .
+
+# Check code style with flake8
+flake8 .
+```
+
+To check formatting without making changes:
+
+```bash
+black --check .
+isort --check .
+```
+
 ## Additional Resources
 
 - **ADK Documentation**: https://google.github.io/adk-docs/

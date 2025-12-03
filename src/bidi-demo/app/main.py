@@ -7,10 +7,6 @@ import warnings
 from pathlib import Path
 
 from dotenv import load_dotenv
-
-# Load environment variables from .env file BEFORE importing agent
-load_dotenv(Path(__file__).parent / ".env")
-
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -19,11 +15,18 @@ from google.adk.agents.run_config import RunConfig, StreamingMode
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 from google.genai import types
-from google_search_agent.agent import agent
+
+# Load environment variables from .env file BEFORE importing agent
+load_dotenv(Path(__file__).parent / ".env")
+
+# Import agent after loading environment variables
+# pylint: disable=wrong-import-position
+from google_search_agent.agent import agent  # noqa: E402
 
 # Configure logging
 logging.basicConfig(
-    level=logging.DEBUG, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    level=logging.DEBUG,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
 
@@ -40,9 +43,8 @@ APP_NAME = "bidi-demo"
 app = FastAPI()
 
 # Mount static files
-app.mount(
-    "/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static"
-)
+static_dir = Path(__file__).parent / "static"
+app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
 # Define your session service
 session_service = InMemorySessionService()
@@ -72,7 +74,7 @@ async def websocket_endpoint(
 ) -> None:
     """WebSocket endpoint for bidirectional streaming with ADK."""
     logger.debug(
-        f"WebSocket connection request: user_id={user_id}, session_id={session_id}"
+        "WebSocket connection request: " f"user_id={user_id}, session_id={session_id}"
     )
     await websocket.accept()
     logger.debug("WebSocket connection accepted")
@@ -90,7 +92,8 @@ async def websocket_endpoint(
     is_native_audio = "native-audio" in model_name.lower()
 
     if is_native_audio:
-        # Native audio models require AUDIO response modality with audio transcription
+        # Native audio models require AUDIO response modality
+        # with audio transcription
         response_modalities = ["AUDIO"]
         run_config = RunConfig(
             streaming_mode=StreamingMode.BIDI,
@@ -100,10 +103,12 @@ async def websocket_endpoint(
             session_resumption=types.SessionResumptionConfig(),
         )
         logger.debug(
-            f"Native audio model detected: {model_name}, using AUDIO response modality"
+            f"Native audio model detected: {model_name}, "
+            "using AUDIO response modality"
         )
     else:
-        # Half-cascade models support TEXT response modality for faster performance
+        # Half-cascade models support TEXT response modality
+        # for faster performance
         response_modalities = ["TEXT"]
         run_config = RunConfig(
             streaming_mode=StreamingMode.BIDI,
@@ -113,7 +118,8 @@ async def websocket_endpoint(
             session_resumption=types.SessionResumptionConfig(),
         )
         logger.debug(
-            f"Half-cascade model detected: {model_name}, using TEXT response modality"
+            f"Half-cascade model detected: {model_name}, "
+            "using TEXT response modality"
         )
     logger.debug(f"RunConfig created: {run_config}")
 
@@ -175,7 +181,7 @@ async def websocket_endpoint(
                     mime_type = json_message.get("mimeType", "image/jpeg")
 
                     logger.debug(
-                        f"Sending image: {len(image_data)} bytes, type: {mime_type}"
+                        f"Sending image: {len(image_data)} bytes, " f"type: {mime_type}"
                     )
 
                     # Send image as blob
@@ -186,7 +192,7 @@ async def websocket_endpoint(
         """Receives Events from run_live() and sends to WebSocket."""
         logger.debug("downstream_task started, calling runner.run_live()")
         logger.debug(
-            f"Starting run_live with user_id={user_id}, session_id={session_id}"
+            f"Starting run_live with user_id={user_id}, " f"session_id={session_id}"
         )
         async for event in runner.run_live(
             user_id=user_id,
