@@ -31,7 +31,7 @@ This table provides a quick reference for all RunConfig parameters covered in th
 
 !!! note "Source Reference"
 
-    [`run_config.py`](https://github.com/google/adk-python/blob/main/src/google/adk/agents/run_config.py)
+    [`run_config.py`](https://github.com/google/adk-python/blob/960b206752918d13f127a9d6ed8d21d34bcbc7fa/src/google/adk/agents/run_config.py)
 
 **Platform Support Legend:**
 
@@ -975,7 +975,7 @@ ADK validates CFC compatibility at session initialization and will raise an erro
 
 - ✅ **Supported**: `gemini-2.x` models (e.g., `gemini-2.5-flash-native-audio-preview-09-2025`)
 - ❌ **Not supported**: `gemini-1.5-x` models
-- **Validation**: ADK checks that the model name starts with `gemini-2` when `support_cfc=True` ([`runners.py:1200-1203`](https://github.com/google/adk-python/blob/main/src/google/adk/runners.py#L1200-L1203))
+- **Validation**: ADK checks that the model name starts with `gemini-2` when `support_cfc=True` ([`runners.py:1288-1291`](https://github.com/google/adk-python/blob/960b206752918d13f127a9d6ed8d21d34bcbc7fa/src/google/adk/runners.py#L1288-L1291))
 - **Code executor**: ADK automatically injects `BuiltInCodeExecutor` when CFC is enabled for safe parallel tool execution
 
 **CFC capabilities:**
@@ -998,7 +998,7 @@ CFC is designed for complex, multi-step workflows that benefit from intelligent 
 **Learn more:**
 
 - [Gemini Function Calling Guide](https://ai.google.dev/gemini-api/docs/function-calling) - Official documentation on compositional and parallel function calling
-- [ADK Parallel Functions Example](https://github.com/google/adk-python/blob/main/contributing/samples/parallel_functions/agent.py) - Working example with async tools
+- [ADK Parallel Functions Example](https://github.com/google/adk-python/blob/960b206752918d13f127a9d6ed8d21d34bcbc7fa/contributing/samples/parallel_functions/agent.py) - Working example with async tools
 - [ADK Performance Guide](https://google.github.io/adk-docs/tools/performance/) - Best practices for parallel-ready tools
 
 ## Summary
