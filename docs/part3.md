@@ -979,7 +979,9 @@ websocket.onmessage = function (event) {
 };
 ```
 
-> 📖 **Demo Implementation**: See the complete WebSocket message handler in [`app.js:297-576`](https://github.com/google/adk-samples/blob/4274c70ae3f4c68595f543ee504474747ea9f0da/python/agents/bidi-demo/app/static/js/app.js#L297-L576)
+!!! note "Demo Implementation"
+
+    See the complete WebSocket message handler in [`app.js:297-576`](https://github.com/google/adk-samples/blob/4274c70ae3f4c68595f543ee504474747ea9f0da/python/agents/bidi-demo/app/static/js/app.js#L297-L576)
 
 ### Optimization for Audio Transmission
 

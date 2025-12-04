@@ -28,7 +28,6 @@ Each part should follow this standard structure where applicable:
 - **Note boxes**: Use `!!! note "Title"` for multi-paragraph supplementary information (never `!!! info`)
 - **Warnings**: Use `!!! warning "Title"` for cautions and potential issues
 - **Tips**: Use `!!! tip "Title"` for production considerations and best practices
-- **Blockquotes**: Use `> 💡 **Learn More**:` and `> 📖 **Source Reference**:` for single-line cross-references
 - **Code blocks**: All code examples should have language tags (```python, ```mermaid, etc.)
 - **Diagrams**: Mermaid diagrams should be used consistently for sequence flows and architecture
 
