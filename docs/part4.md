@@ -410,7 +410,7 @@ Understanding the constraints of each platform is critical for production planni
 
     - [Gemini Live API Capabilities Guide](https://ai.google.dev/gemini-api/docs/live-guide)
     - [Gemini API Quotas](https://ai.google.dev/gemini-api/docs/quota)
-    - [Vertex AI Streamed Conversations](https://cloud.google.com/vertex-ai/generative-ai/docs/live-api/streamed-conversations)
+    - [Vertex AI Live API](https://cloud.google.com/vertex-ai/generative-ai/docs/live-api)
 
 ## Live API Session Resumption
 
@@ -720,7 +720,7 @@ Both platforms limit how many Live API sessions can run simultaneously, but the 
 
 !!! note "Source"
 
-    [Vertex AI Live API Streamed Conversations](https://cloud.google.com/vertex-ai/generative-ai/docs/live-api/streamed-conversations) | [Vertex AI Quotas](https://cloud.google.com/vertex-ai/generative-ai/docs/quotas)
+    [Vertex AI Live API](https://cloud.google.com/vertex-ai/generative-ai/docs/live-api) | [Vertex AI Quotas](https://cloud.google.com/vertex-ai/generative-ai/docs/quotas)
 
 **Requesting a quota increase:**
 
