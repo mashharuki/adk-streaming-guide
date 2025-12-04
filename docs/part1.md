@@ -410,10 +410,6 @@ In the following sections, you'll see each phase detailed, showing exactly when 
 
 These components are created once when your application starts and shared across all streaming sessions. They define your agent's capabilities, manage conversation history, and orchestrate the streaming execution.
 
-!!! info "Python Version Requirement"
-
-    ADK requires **Python 3.10 or higher**. As of ADK v1.19.0, Python 3.9 is no longer supported. Ensure your development and production environments meet this requirement before installing ADK.
-
 #### Define Your Agent
 
 The `Agent` is the core of your streaming application—it defines what your AI can do, how it should behave, and which AI model powers it. You configure your agent with a specific model, tools it can use (like Google Search or custom APIs), and instructions that shape its personality and behavior.

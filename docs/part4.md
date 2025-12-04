@@ -2,7 +2,7 @@
 
 In Part 3, you learned how to handle events from `run_live()` to process model responses, tool calls, and streaming updates. This part shows you how to configure those streaming sessions through `RunConfig`—controlling response formats, managing session lifecycles, and enforcing production constraints.
 
-**What you'll learn**: This part covers response modalities and their constraints, explores the differences between BIDI and SSE streaming modes, examines the relationship between ADK Sessions and Live API sessions, and shows how to manage session duration with session resumption and context window compression. You'll understand how to handle concurrent session quotas, implement architectural patterns for quota management, configure cost controls through `max_llm_calls` and audio persistence options, and track token usage in real-time for production monitoring (new in v1.18.0). With RunConfig mastery, you can build production-ready streaming applications that balance feature richness with operational constraints.
+**What you'll learn**: This part covers response modalities and their constraints, explores the differences between BIDI and SSE streaming modes, examines the relationship between ADK Sessions and Live API sessions, and shows how to manage session duration with session resumption and context window compression. You'll understand how to handle concurrent session quotas, implement architectural patterns for quota management, and configure cost controls through `max_llm_calls` and audio persistence options. With RunConfig mastery, you can build production-ready streaming applications that balance feature richness with operational constraints.
 
 !!! note "Learn More"
 
@@ -221,32 +221,30 @@ sequenceDiagram
     Note over ADK,Gemini: Turn Detection: finish_reason
 ```
 
-!!! info "Progressive SSE Streaming (New in v1.19.0)"
+### Progressive SSE Streaming
 
-    ADK v1.19.0 introduced **progressive SSE streaming**, an experimental feature that enhances how SSE mode delivers streaming responses. When enabled, this feature improves response aggregation by:
+**Progressive SSE streaming** is an experimental feature that enhances how SSE mode delivers streaming responses. When enabled, this feature improves response aggregation by:
 
-    **Key improvements:**
+- **Content ordering preservation**: Maintains the original order of mixed content types (text, function calls, inline data)
+- **Intelligent text merging**: Only merges consecutive text parts of the same type (regular text vs thought text)
+- **Progressive delivery**: Marks all intermediate chunks as `partial=True`, with a single final aggregated response at the end
+- **Deferred function execution**: Skips executing function calls in partial events, only executing them in the final aggregated event to avoid duplicate executions
 
-    - **Content ordering preservation**: Maintains the original order of mixed content types (text, function calls, inline data)
-    - **Intelligent text merging**: Only merges consecutive text parts of the same type (regular text vs thought text)
-    - **Progressive delivery**: Marks all intermediate chunks as `partial=True`, with a single final aggregated response at the end
-    - **Deferred function execution**: Skips executing function calls in partial events, only executing them in the final aggregated event to avoid duplicate executions
+**Enabling the feature:**
 
-    **Enabling the feature:**
+This is an experimental (WIP stage) feature disabled by default. Enable it via environment variable:
 
-    This is an experimental (WIP stage) feature disabled by default. Enable it via environment variable:
+```bash
+export ADK_ENABLE_PROGRESSIVE_SSE_STREAMING=1
+```
 
-    ```bash
-    export ADK_ENABLE_PROGRESSIVE_SSE_STREAMING=1
-    ```
+**When to use:**
 
-    **When to use:**
+- You're using `StreamingMode.SSE` and need better handling of mixed content types (text + function calls)
+- Your responses include thought text (extended thinking) mixed with regular text
+- You want to ensure function calls execute only once after complete response aggregation
 
-    - You're using `StreamingMode.SSE` and need better handling of mixed content types (text + function calls)
-    - Your responses include thought text (extended thinking) mixed with regular text
-    - You want to ensure function calls execute only once after complete response aggregation
-
-    **Note:** This feature only affects `StreamingMode.SSE`. It does not apply to `StreamingMode.BIDI` (the focus of this guide), which uses the Live API's native bidirectional protocol.
+**Note:** This feature only affects `StreamingMode.SSE`. It does not apply to `StreamingMode.BIDI` (the focus of this guide), which uses the Live API's native bidirectional protocol.
 
 ### When to Use Each Mode
 

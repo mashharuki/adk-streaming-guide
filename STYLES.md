@@ -43,6 +43,11 @@ Each part should follow this standard structure where applicable:
   - Specify "Gemini Live API" or "Vertex AI Live API" when platform-specific
   - Use "bidirectional streaming" or "bidi-streaming" consistently (not "bi-directional")
   - Use "ADK" not "the ADK" or "Google ADK" (unless first mention)
+- **Version independence**:
+  - Do NOT mention ADK version numbers (e.g., "v1.19.0", "ADK 1.18")
+  - Do NOT label features as "new" or "introduced in version X"
+  - Write documentation as if describing the current state of ADK
+  - This keeps the guide evergreen and avoids version-dependent maintenance
 - **Third-party product disclaimers** (PROHIBITED):
   - **NEVER include disclaimers** for third-party products or services in ADK documentation
   - Such disclaimers must ONLY be published by the owners of those products

@@ -5,7 +5,7 @@ The `run_live()` method is ADK's primary entry point for streaming conversations
 You'll learn how to process different event types (text, audio, transcriptions, tool calls), manage conversation flow with interruption and turn completion signals, serialize events for network transport, and leverage ADK's automatic tool execution. Understanding event handling is essential for building responsive streaming applications that feel natural and real-time to users.
 
 !!! note "Async Context Required"
-    
+
     All `run_live()` code requires async context. See [Part 1: FastAPI Application Example](part1.md#fastapi-application-example) for details and production examples.
     
 ## How run_live() Works
