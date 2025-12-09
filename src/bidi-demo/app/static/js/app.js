@@ -12,9 +12,27 @@ const sessionId = "demo-session-" + Math.random().toString(36).substring(7);
 let websocket = null;
 let is_audio = false;
 
-// Build WebSocket URL (mode is determined server-side from model name)
+// Get checkbox elements for RunConfig options
+const enableProactivityCheckbox = document.getElementById("enableProactivity");
+const enableAffectiveDialogCheckbox = document.getElementById("enableAffectiveDialog");
+
+// Build WebSocket URL with RunConfig options as query parameters
 function getWebSocketUrl() {
-  return "ws://" + window.location.host + "/ws/" + userId + "/" + sessionId;
+  const baseUrl = "ws://" + window.location.host + "/ws/" + userId + "/" + sessionId;
+  const params = new URLSearchParams();
+
+  // Add proactivity option if checked
+  if (enableProactivityCheckbox && enableProactivityCheckbox.checked) {
+    params.append("proactivity", "true");
+  }
+
+  // Add affective dialog option if checked
+  if (enableAffectiveDialogCheckbox && enableAffectiveDialogCheckbox.checked) {
+    params.append("affective_dialog", "true");
+  }
+
+  const queryString = params.toString();
+  return queryString ? baseUrl + "?" + queryString : baseUrl;
 }
 
 // Get DOM elements
