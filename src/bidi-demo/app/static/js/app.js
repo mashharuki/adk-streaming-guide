@@ -379,6 +379,36 @@ function connectWebsocket() {
     } else if (adkEvent.content && adkEvent.content.parts) {
       const hasText = adkEvent.content.parts.some(p => p.text);
       const hasAudio = adkEvent.content.parts.some(p => p.inlineData);
+      const hasExecutableCode = adkEvent.content.parts.some(p => p.executableCode);
+      const hasCodeExecutionResult = adkEvent.content.parts.some(p => p.codeExecutionResult);
+
+      if (hasExecutableCode) {
+        // Show executable code
+        const codePart = adkEvent.content.parts.find(p => p.executableCode);
+        if (codePart && codePart.executableCode) {
+          const code = codePart.executableCode.code || '';
+          const language = codePart.executableCode.language || 'unknown';
+          const truncated = code.length > 60
+            ? code.substring(0, 60).replace(/\n/g, ' ') + '...'
+            : code.replace(/\n/g, ' ');
+          eventSummary = `Executable Code (${language}): ${truncated}`;
+          eventEmoji = '💻';
+        }
+      }
+
+      if (hasCodeExecutionResult) {
+        // Show code execution result
+        const resultPart = adkEvent.content.parts.find(p => p.codeExecutionResult);
+        if (resultPart && resultPart.codeExecutionResult) {
+          const outcome = resultPart.codeExecutionResult.outcome || 'UNKNOWN';
+          const output = resultPart.codeExecutionResult.output || '';
+          const truncatedOutput = output.length > 60
+            ? output.substring(0, 60).replace(/\n/g, ' ') + '...'
+            : output.replace(/\n/g, ' ');
+          eventSummary = `Code Execution Result (${outcome}): ${truncatedOutput}`;
+          eventEmoji = outcome === 'OUTCOME_OK' ? '✅' : '❌';
+        }
+      }
 
       if (hasText) {
         // Show text preview in summary
