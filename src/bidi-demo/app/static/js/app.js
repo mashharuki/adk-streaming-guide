@@ -31,6 +31,7 @@ let currentInputTranscriptionId = null;
 let currentInputTranscriptionElement = null;
 let currentOutputTranscriptionId = null;
 let currentOutputTranscriptionElement = null;
+let inputTranscriptionFinished = false; // Track if input transcription is complete for this turn
 
 // Helper function to clean spaces between CJK characters
 // Removes spaces between Japanese/Chinese/Korean characters while preserving spaces around Latin text
@@ -389,6 +390,7 @@ function connectWebsocket() {
       currentBubbleElement = null;
       currentOutputTranscriptionId = null;
       currentOutputTranscriptionElement = null;
+      inputTranscriptionFinished = false; // Reset for next turn
       return;
     }
 
@@ -432,6 +434,7 @@ function connectWebsocket() {
       currentBubbleElement = null;
       currentOutputTranscriptionId = null;
       currentOutputTranscriptionElement = null;
+      inputTranscriptionFinished = false; // Reset for next turn
       return;
     }
 
@@ -441,6 +444,11 @@ function connectWebsocket() {
       const isFinished = adkEvent.inputTranscription.finished;
 
       if (transcriptionText) {
+        // Ignore late-arriving transcriptions after we've finished for this turn
+        if (inputTranscriptionFinished) {
+          return;
+        }
+
         if (currentInputTranscriptionId == null) {
           // Create new transcription bubble
           currentInputTranscriptionId = Math.random().toString(36).substring(7);
@@ -473,10 +481,11 @@ function connectWebsocket() {
           }
         }
 
-        // If transcription is finished, reset the state
+        // If transcription is finished, reset the state and mark as complete
         if (isFinished) {
           currentInputTranscriptionId = null;
           currentInputTranscriptionElement = null;
+          inputTranscriptionFinished = true; // Prevent duplicate bubbles from late events
         }
 
         scrollToBottom();
@@ -500,6 +509,7 @@ function connectWebsocket() {
           // Reset input transcription state so next user input creates new balloon
           currentInputTranscriptionId = null;
           currentInputTranscriptionElement = null;
+          inputTranscriptionFinished = true; // Prevent duplicate bubbles from late events
         }
 
         if (currentOutputTranscriptionId == null) {
@@ -551,6 +561,7 @@ function connectWebsocket() {
         // Reset input transcription state so next user input creates new balloon
         currentInputTranscriptionId = null;
         currentInputTranscriptionElement = null;
+        inputTranscriptionFinished = true; // Prevent duplicate bubbles from late events
       }
 
       for (const part of parts) {
