@@ -25,6 +25,7 @@ const statusIndicator = document.getElementById("statusIndicator");
 const statusText = document.getElementById("statusText");
 const consoleContent = document.getElementById("consoleContent");
 const clearConsoleBtn = document.getElementById("clearConsole");
+const showAudioEventsCheckbox = document.getElementById("showAudioEvents");
 let currentMessageId = null;
 let currentBubbleElement = null;
 let currentInputTranscriptionId = null;
@@ -60,7 +61,12 @@ function formatTimestamp() {
   return now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit', fractionalSecondDigits: 3 });
 }
 
-function addConsoleEntry(type, content, data = null, emoji = null, author = null) {
+function addConsoleEntry(type, content, data = null, emoji = null, author = null, isAudio = false) {
+  // Skip audio events if checkbox is unchecked
+  if (isAudio && !showAudioEventsCheckbox.checked) {
+    return;
+  }
+
   const entry = document.createElement("div");
   entry.className = `console-entry ${type}`;
 
@@ -361,12 +367,22 @@ function connectWebsocket() {
           eventSummary = 'Audio Response';
           eventEmoji = '🔊';
         }
+
+        // Log audio event with isAudio flag (filtered by checkbox)
+        const sanitizedEvent = sanitizeEventForDisplay(adkEvent);
+        addConsoleEntry('incoming', eventSummary, sanitizedEvent, eventEmoji, author, true);
       }
     }
 
     // Create a sanitized version for console display (replace large audio data with summary)
-    const sanitizedEvent = sanitizeEventForDisplay(adkEvent);
-    addConsoleEntry('incoming', eventSummary, sanitizedEvent, eventEmoji, author);
+    // Skip if already logged as audio event above
+    const isAudioOnlyEvent = adkEvent.content && adkEvent.content.parts &&
+      adkEvent.content.parts.some(p => p.inlineData) &&
+      !adkEvent.content.parts.some(p => p.text);
+    if (!isAudioOnlyEvent) {
+      const sanitizedEvent = sanitizeEventForDisplay(adkEvent);
+      addConsoleEntry('incoming', eventSummary, sanitizedEvent, eventEmoji, author);
+    }
 
     // Handle turn complete event
     if (adkEvent.turnComplete === true) {
