@@ -131,18 +131,23 @@ export SSL_CERT_FILE=$(python -m certifi)
 
 ### Start the Server
 
-From the `src/bidi-demo` directory, run:
+From the `src/bidi-demo` directory, first change to the `app` subdirectory:
+
+```bash
+cd app
+```
+
+> **Note:** You must run from inside the `app` directory so Python can find the `google_search_agent` module. Running from the parent directory will fail with `ModuleNotFoundError: No module named 'google_search_agent'`.
 
 **Using uv (recommended):**
 
 ```bash
-uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+uv run --project .. uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 **Using pip (with activated venv):**
 
 ```bash
-cd app
 uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
@@ -153,8 +158,8 @@ The `--reload` flag enables auto-restart on code changes during development.
 To run in background with log output:
 
 ```bash
-# Using uv
-uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 > server.log 2>&1 &
+# Using uv (from app directory)
+uv run --project .. uvicorn main:app --host 0.0.0.0 --port 8000 > server.log 2>&1 &
 
 # Using pip (from app directory)
 uvicorn main:app --host 0.0.0.0 --port 8000 > server.log 2>&1 &
