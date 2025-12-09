@@ -368,6 +368,14 @@ function connectWebsocket() {
         : transcriptionText;
       eventSummary = `Output Transcription: "${truncated}"`;
       eventEmoji = '📝';
+    } else if (adkEvent.usageMetadata) {
+      // Show token usage information
+      const usage = adkEvent.usageMetadata;
+      const promptTokens = usage.promptTokenCount || 0;
+      const responseTokens = usage.candidatesTokenCount || 0;
+      const totalTokens = usage.totalTokenCount || 0;
+      eventSummary = `Token Usage: ${totalTokens.toLocaleString()} total (${promptTokens.toLocaleString()} prompt + ${responseTokens.toLocaleString()} response)`;
+      eventEmoji = '📊';
     } else if (adkEvent.content && adkEvent.content.parts) {
       const hasText = adkEvent.content.parts.some(p => p.text);
       const hasAudio = adkEvent.content.parts.some(p => p.inlineData);
