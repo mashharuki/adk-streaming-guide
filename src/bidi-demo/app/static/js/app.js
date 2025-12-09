@@ -16,6 +16,23 @@ let is_audio = false;
 const enableProactivityCheckbox = document.getElementById("enableProactivity");
 const enableAffectiveDialogCheckbox = document.getElementById("enableAffectiveDialog");
 
+// Reconnect WebSocket when RunConfig options change
+function handleRunConfigChange() {
+  if (websocket && websocket.readyState === WebSocket.OPEN) {
+    addSystemMessage("Reconnecting with updated settings...");
+    addConsoleEntry('outgoing', 'Reconnecting due to settings change', {
+      proactivity: enableProactivityCheckbox.checked,
+      affective_dialog: enableAffectiveDialogCheckbox.checked
+    }, '🔄', 'system');
+    websocket.close();
+    // connectWebsocket() will be called by onclose handler after delay
+  }
+}
+
+// Add change listeners to RunConfig checkboxes
+enableProactivityCheckbox.addEventListener("change", handleRunConfigChange);
+enableAffectiveDialogCheckbox.addEventListener("change", handleRunConfigChange);
+
 // Build WebSocket URL with RunConfig options as query parameters
 function getWebSocketUrl() {
   const baseUrl = "ws://" + window.location.host + "/ws/" + userId + "/" + sessionId;
