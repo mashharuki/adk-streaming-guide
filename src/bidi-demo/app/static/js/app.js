@@ -457,13 +457,19 @@ function connectWebsocket() {
           // Update existing transcription bubble only if model hasn't started responding
           // This prevents late partial transcriptions from overwriting complete ones
           if (currentOutputTranscriptionId == null && currentMessageId == null) {
-            // Accumulate input transcription text (Live API sends incremental pieces)
-            const existingText = currentInputTranscriptionElement.querySelector(".bubble-text").textContent;
-            // Remove typing indicator if present
-            const cleanText = existingText.replace(/\.\.\.$/, '');
-            // Clean spaces between CJK characters before updating
-            const accumulatedText = cleanCJKSpaces(cleanText + transcriptionText);
-            updateMessageBubble(currentInputTranscriptionElement, accumulatedText, !isFinished);
+            if (isFinished) {
+              // Final transcription contains the complete text, replace entirely
+              const cleanedText = cleanCJKSpaces(transcriptionText);
+              updateMessageBubble(currentInputTranscriptionElement, cleanedText, false);
+            } else {
+              // Partial transcription - append to existing text
+              const existingText = currentInputTranscriptionElement.querySelector(".bubble-text").textContent;
+              // Remove typing indicator if present
+              const cleanText = existingText.replace(/\.\.\.$/, '');
+              // Clean spaces between CJK characters before updating
+              const accumulatedText = cleanCJKSpaces(cleanText + transcriptionText);
+              updateMessageBubble(currentInputTranscriptionElement, accumulatedText, true);
+            }
           }
         }
 
@@ -508,10 +514,16 @@ function connectWebsocket() {
           messagesDiv.appendChild(currentOutputTranscriptionElement);
         } else {
           // Update existing transcription bubble
-          const existingText = currentOutputTranscriptionElement.querySelector(".bubble-text").textContent;
-          // Remove typing indicator if present
-          const cleanText = existingText.replace(/\.\.\.$/, '');
-          updateMessageBubble(currentOutputTranscriptionElement, cleanText + transcriptionText, !isFinished);
+          if (isFinished) {
+            // Final transcription contains the complete text, replace entirely
+            updateMessageBubble(currentOutputTranscriptionElement, transcriptionText, false);
+          } else {
+            // Partial transcription - append to existing text
+            const existingText = currentOutputTranscriptionElement.querySelector(".bubble-text").textContent;
+            // Remove typing indicator if present
+            const cleanText = existingText.replace(/\.\.\.$/, '');
+            updateMessageBubble(currentOutputTranscriptionElement, cleanText + transcriptionText, true);
+          }
         }
 
         // If transcription is finished, reset the state
