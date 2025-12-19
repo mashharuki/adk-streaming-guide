@@ -1486,4 +1486,4 @@ In this part, you mastered event handling in ADK's Bidi-streaming architecture. 
 
 ---
 
-← [Previous: Part 2 - Sending Messages with LiveRequestQueue](part2.md) | [Next: Part 4 - Understanding RunConfig](part4.md) →
+← [Previous: Part 2: Sending Messages with LiveRequestQueue](part2.md) | [Next: Part 4: Understanding RunConfig](part4.md) →

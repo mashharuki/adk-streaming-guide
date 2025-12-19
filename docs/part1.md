@@ -911,4 +911,4 @@ In this introduction, you learned how ADK transforms complex real-time streaming
 
 ---
 
-[Next: Part 2 - Sending Messages with LiveRequestQueue](part2.md) →
+[Next: Part 2: Sending Messages with LiveRequestQueue](part2.md) →

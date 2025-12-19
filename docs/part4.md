@@ -1007,4 +1007,4 @@ In this part, you learned how RunConfig enables sophisticated control over ADK B
 
 ---
 
-← [Previous: Part 3 - Event Handling with run_live()](part3.md) | [Next: Part 5 - How to Use Audio, Image and Video](part5.md) →
+← [Previous: Part 3: Event Handling with run_live()](part3.md) | [Next: Part 5: How to Use Audio, Image and Video](part5.md) →

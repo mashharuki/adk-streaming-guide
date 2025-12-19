@@ -261,4 +261,4 @@ In this part, you learned how `LiveRequestQueue` provides a unified interface fo
 
 ---
 
-← [Previous: Part 1 - Introduction to ADK Bidi-streaming](part1.md) | [Next: Part 3 - Event Handling with run_live()](part3.md) →
+← [Previous: Part 1: Introduction to ADK Bidi-streaming](part1.md) | [Next: Part 3: Event Handling with run_live()](part3.md) →
