@@ -222,51 +222,65 @@ Type a message like "Hello!" in the text input and click **Send**. If everything
 
 ## Section 2: Architecture Overview (15 min)
 
-### 2.1 The 4-Phase Lifecycle
+### 2.1 High-Level Architecture
 
-ADK Bidi-streaming applications follow a consistent 4-phase lifecycle. Understanding these phases is essential for building robust streaming applications.
+Before diving into code, you need a mental model of how the pieces connect. ADK Bidi-streaming follows a clean separation of concerns across three layers, each with distinct responsibilities:
 
-```mermaid
-graph TB
-    subgraph "Application"
-        subgraph "Client"
-            C1["Web / Mobile"]
-        end
+![ADK Bidi-streaming High-Level Architecture](assets/Bidi_arch.jpeg)
 
-        subgraph "Transport Layer"
-            T1["WebSocket (FastAPI)"]
-        end
-    end
+**You own the application layer.** This includes the client applications your users interact with (web, mobile, kiosk) and the transport server that manages connections. Most teams use FastAPI with WebSockets, but any framework supporting real-time communication works. You also define your Agent—the instructions, tools, and behaviors that make your AI unique.
 
-    subgraph "ADK"
-        subgraph "ADK Bidi-streaming"
-            L1[LiveRequestQueue]
-            L2[Runner]
-            L3[Agent]
-        end
+**ADK handles the orchestration.** The framework provides three key components that eliminate infrastructure work:
 
-        subgraph "LLM Integration"
-            G1[GeminiLlmConnection]
-            G2[Gemini Live API / Vertex AI Live API]
-        end
-    end
+| Component | Purpose |
+|-----------|---------|
+| **LiveRequestQueue** | Buffers and sequences incoming messages so you don't worry about race conditions |
+| **Runner** | Manages session lifecycles and conversation state |
+| **LLM Flow** | Handles the complex protocol translation you never want to write yourself |
 
-    C1 <--> T1
-    T1 -->|"live_request_queue.send()"| L1
-    L1 -->|"runner.run_live(queue)"| L2
-    L2 -->|"agent execution"| L3
-    L3 -->|"llm.connect()"| G1
-    G1 <--> G2
-    G1 -->|"yield Event"| L3
-    L3 -->|"yield Event"| L2
-    L2 -->|"yield Event"| T1
-```
+**Google provides the AI backbone.** The Live API—available through Gemini Live API for rapid prototyping or Vertex AI Live API for enterprise production—delivers real-time, low-latency AI processing with built-in support for audio, video, and natural interruptions.
 
-The diagram shows how data flows through the ADK stack: your application sends input through `LiveRequestQueue`, ADK processes it through `Runner` and `Agent`, connects to the Live API, and streams events back to your application.
+> **Why this matters:** The bidirectional arrows in the diagram aren't just decoration—they represent true concurrent communication. Users can interrupt the AI mid-sentence, just like in human conversation. This is fundamentally different from request-response APIs, and it's what makes voice AI feel natural rather than robotic.
+
+The key insight is that ADK abstracts away the complexity of managing WebSocket connections to the Live API. Your application only needs to:
+
+1. **Send input** through `LiveRequestQueue` (upstream)
+2. **Process events** from `run_live()` (downstream)
+
+ADK handles everything in between: connection management, message serialization, tool execution, and session state.
+
+### 2.2 Why ADK Over Raw Live API?
+
+Now that you understand where the pieces fit, the natural question is: why use ADK instead of building directly on the Live API? After all, the underlying Gemini API is well-documented.
+
+The answer becomes viscerally clear when you compare the two approaches side-by-side.
+
+![Raw Live API vs. ADK Bidi-streaming](assets/live_vs_adk.png)
+
+With the raw Live API, you're responsible for everything. Tool execution? You detect function calls, invoke your code, format responses, and send them back—manually coordinating with ongoing audio streams. Connection drops? You implement reconnection logic, cache session handles, and restore state. Session persistence? You design the schema, handle serialization, and manage the storage layer.
+
+**ADK transforms all of this into declarative configuration.** Tools execute automatically in parallel. Connections resume transparently when WebSocket timeouts occur. Sessions persist to your choice of database with zero custom code. Events arrive as typed Pydantic models you can serialize with a single method call.
+
+| Capability | Raw Live API | ADK Bidi-streaming |
+|------------|--------------|-------------------|
+| Agent Framework | Build from scratch | Single/multi-agent with tools, evaluation, security |
+| Tool Execution | Manual handling | Automatic parallel execution |
+| Connection Management | Manual reconnection | Transparent session resumption |
+| Event Model | Custom structures | Unified, typed Event objects |
+| Async Framework | Manual coordination | LiveRequestQueue + run_live() generator |
+| Session Persistence | Manual implementation | Built-in SQL, Vertex AI, or in-memory |
+
+> **The bottom line:** ADK reduces months of infrastructure development to days of application development. You focus on what your agent does, not how streaming works.
+
+### 2.3 The 4-Phase Lifecycle
+
+Every ADK Bidi-streaming application follows a predictable four-phase lifecycle. Understanding these phases isn't just organizational—it's the key to resource efficiency and clean code architecture.
+
+![ADK Bidi-streaming Application Lifecycle](assets/app_lifecycle.png)
 
 #### Phase 1: Application Initialization (Once at Startup)
 
-This phase runs once when your server starts. You create the core components that will be shared across all user sessions:
+When your server starts, you create three foundational components that live for the lifetime of the process. These components are stateless and thread-safe—a single Runner can handle thousands of concurrent users because the per-user state lives elsewhere.
 
 | Component | Purpose |
 |-----------|---------|
@@ -313,7 +327,7 @@ live_request_queue = LiveRequestQueue()
 
 #### Phase 3: Bidi-streaming (Active Session)
 
-The core of your application: concurrent upstream and downstream tasks running simultaneously.
+This is where the magic happens. Two concurrent async tasks run simultaneously:
 
 ```
 ┌─────────┐     WebSocket      ┌─────────┐   LiveRequestQueue   ┌──────────┐
@@ -328,14 +342,14 @@ The core of your application: concurrent upstream and downstream tasks running s
                    (receives input)      (sends events)
 ```
 
-**Upstream Task**: Receives messages from the client and forwards them to LiveRequestQueue
-**Downstream Task**: Receives events from run_live() and forwards them to the client
+**Upstream Task**: Sends messages from your WebSocket through the queue to the agent
+**Downstream Task**: Receives events from the agent and forwards them to your client
 
-Both tasks run concurrently using `asyncio.gather()`.
+The user can speak while the AI is responding. The AI can be interrupted mid-sentence. It's true two-way communication, not alternating monologues. Both tasks run concurrently using `asyncio.gather()`.
 
 #### Phase 4: Termination (Session End)
 
-When the session ends (client disconnects, error, or explicit close):
+When the connection ends—whether the user disconnects, a timeout occurs, or an error happens—you close the LiveRequestQueue. This sends a graceful termination signal, stops the run_live() loop, and ensures session state is persisted for future resumption.
 
 ```python
 finally:
@@ -345,7 +359,9 @@ finally:
 
 > **Critical**: Always close `LiveRequestQueue` in a `finally` block to ensure proper cleanup, even if exceptions occur.
 
-### 2.2 Core Components Deep Dive
+> **Session Continuity**: The arrow from Phase 4 back to Phase 2 represents session continuity. When a user reconnects—even days later—their conversation history is restored from the SessionService. The Live API session is ephemeral, but the ADK Session is permanent (when using persistent storage like SQL or Vertex AI).
+
+### 2.4 Core Components Deep Dive
 
 #### Agent
 
@@ -366,7 +382,23 @@ agent = Agent(
 
 #### LiveRequestQueue
 
-The LiveRequestQueue is your channel for sending input to the model. It provides three key methods:
+The path from your application to the AI flows through a single interface: LiveRequestQueue. Instead of juggling different APIs for text, audio, and control signals, you use one elegant queue that handles everything.
+
+![ADK Bidi-Streaming: Upstream Flow with LiveRequestQueue](assets/live_req_queue.png)
+
+**Sending text** is straightforward. When a user types a message, you wrap it in a Content object and call `send_content()`. This signals a complete turn to the model, triggering immediate response generation.
+
+**Streaming audio** works differently. You call `send_realtime()` with small chunks (50-100ms recommended) continuously as the user speaks. The model processes audio in real-time, using Voice Activity Detection to determine when the user has finished.
+
+**Manual turn control** is available when you need it. If you're building a push-to-talk interface or using client-side VAD, `send_activity_start()` and `send_activity_end()` explicitly signal speech boundaries.
+
+**Graceful shutdown** happens through `close()`. This tells the Live API to terminate cleanly rather than waiting for a timeout.
+
+The queue is built on Python's asyncio.Queue, which means it's non-blocking and thread-safe within the event loop. Messages are processed in FIFO order—what you send first arrives first.
+
+> **Pro tip:** Don't wait for model responses before sending the next audio chunk. The queue handles buffering, and the model expects continuous streaming. Waiting creates awkward pauses in conversation.
+
+It provides four key methods:
 
 ```mermaid
 graph LR
@@ -419,7 +451,11 @@ live_request_queue.close()
 
 #### run_live()
 
-The `run_live()` method is an async generator that yields events from the model:
+The return path—from the AI back to your application—centers on `run_live()`. This async generator is the heart of ADK streaming, yielding events in real-time without buffering.
+
+![Comprehensive Summary of ADK Live Event Handling: The run_live() Method](assets/run_live.png)
+
+You call it with three inputs: **identity** (user_id and session_id), **channel** (the LiveRequestQueue for upstream messages), and **configuration** (RunConfig for streaming behavior). The method returns an async generator that yields Event objects as they arrive.
 
 ```python
 async for event in runner.run_live(
@@ -428,21 +464,64 @@ async for event in runner.run_live(
     live_request_queue=live_request_queue,
     run_config=run_config
 ):
-    # Process each event
-    if event.content:
-        # Handle text or audio content
-        pass
-    if event.input_transcription:
-        # Handle user speech transcription
-        pass
-    if event.output_transcription:
-        # Handle model speech transcription
-        pass
+    # Process each event as it arrives
+    await websocket.send_text(event.model_dump_json())
 ```
+
+**The Seven Event Types:**
+
+| Event Type | Field | Description |
+|------------|-------|-------------|
+| Text | `event.content.parts[0].text` | Model's written response (arrives incrementally with `partial=True`) |
+| Audio (inline) | `event.content.parts[0].inline_data` | Real-time audio for immediate playback (not persisted) |
+| Audio (file) | `event.content.parts[0].file_data` | References stored artifacts when `save_live_blob` is enabled |
+| Input Transcription | `event.input_transcription` | User speech converted to text |
+| Output Transcription | `event.output_transcription` | Model speech converted to text |
+| Metadata | `event.usage_metadata` | Token usage for cost monitoring |
+| Tool Calls | `event.actions` | Function execution (ADK handles automatically) |
+| Errors | `event.error` | Error code and message |
+
+> **Inline vs File Audio:** Audio events come in two forms. Inline audio (`inline_data`) streams in real-time for immediate playback but is never saved. File audio (`file_data`) references stored artifacts when you enable persistence with `save_live_blob=True` in RunConfig—useful for debugging, compliance, or training data collection.
+
+**The Three Flow Control Flags:**
+
+- **`partial`**: Whether you're seeing an incremental chunk or complete text
+- **`interrupted`**: User started speaking while model was responding—stop playback immediately
+- **`turn_complete`**: Model finished its response—re-enable microphone, hide indicators
+
+> **Why `interrupted` matters:** This flag is what makes voice AI feel natural. Without it, users must wait silently for the AI to finish speaking. With it, conversation flows like it does between humans.
 
 #### RunConfig
 
-RunConfig controls how your streaming session behaves:
+RunConfig is your control center for streaming behavior. Every aspect of a session—from audio format to cost limits—is configured here.
+
+![Comprehensive Summary of Live API RunConfig](assets/runconfig.png)
+
+**Essential Parameters:**
+
+| Parameter | Purpose |
+|-----------|---------|
+| `response_modalities` | `["TEXT"]` for chat, `["AUDIO"]` for voice (choose one per session) |
+| `streaming_mode` | `BIDI` for WebSocket streaming, `SSE` for HTTP streaming |
+| `session_resumption` | Enable automatic reconnection after WebSocket timeouts (~10 min) |
+| `context_window_compression` | Remove session duration limits (15 min audio, 2 min video) and manage token limits |
+
+**Production Controls:**
+
+| Parameter | Purpose |
+|-----------|---------|
+| `max_llm_calls` | Cap invocations per session for cost control (SSE mode only) |
+| `save_live_blob` | Persist audio/video for debugging, compliance, or training |
+| `custom_metadata` | Attach key-value data for user segmentation or A/B testing |
+
+**Understanding Session Types:**
+
+One concept trips up many developers: ADK Session vs Live API session.
+
+- **ADK Session**: Persistent, lives in SessionService, survives restarts. User returns days later with history intact.
+- **Live API session**: Ephemeral, exists only during active `run_live()`. When loop ends, it's destroyed—but ADK persisted events.
+
+> **Quota planning:** Gemini Live API allows 50-1,000 concurrent sessions depending on tier. Vertex AI supports up to 1,000 per project.
 
 ```python
 from google.adk.agents.run_config import RunConfig, StreamingMode
@@ -459,13 +538,16 @@ run_config = RunConfig(
     input_audio_transcription=types.AudioTranscriptionConfig(),
     output_audio_transcription=types.AudioTranscriptionConfig(),
 
+    # Session management
+    session_resumption=types.SessionResumptionConfig(),
+
     # Advanced features (native audio models only)
     proactivity=types.ProactivityConfig(proactive_audio=True),
     enable_affective_dialog=True
 )
 ```
 
-### 2.3 Client-Side: WebSocket Connection
+### 2.5 Client-Side: WebSocket Connection
 
 While the server handles ADK communication, the client manages the WebSocket connection and user interface. Here's how the client connects:
 
@@ -529,27 +611,50 @@ connectWebsocket();
 3. **Auto-reconnect**: Client automatically reconnects on disconnection
 4. **Event handling**: All ADK events parsed from JSON and processed
 
-### 2.4 Understanding Audio Model Architectures
+### 2.6 Multimodal Capabilities
 
-The Live API supports two audio model architectures with different capabilities:
+ADK Bidi-streaming isn't limited to text—it's a full multimodal platform supporting audio, images, and video. Understanding the specifications helps you build robust applications.
 
-#### Native Audio Models
+![Comprehensive Summary of ADK Live API Multimodal Capabilities](assets/multimodal.png)
 
-End-to-end audio processing without intermediate text conversion:
+#### Audio: The Core Modality
+
+| Direction | Format | Sample Rate | Channels | Chunk Size |
+|-----------|--------|-------------|----------|------------|
+| **Input** (your voice) | 16-bit PCM | 16 kHz | Mono | 50-100ms (1,600-3,200 bytes) |
+| **Output** (model voice) | 16-bit PCM | 24 kHz | Mono | Use ring buffer for smooth playback |
+
+The browser's AudioWorklet captures microphone input, converts Float32 samples to Int16, and streams via WebSocket. For playback, use a ring buffer in your AudioWorklet player to absorb network jitter.
+
+#### Image and Video
+
+Both images and video use the same mechanism—JPEG frames sent via `send_realtime()`:
+
+| Property | Specification |
+|----------|---------------|
+| Format | JPEG |
+| Resolution | 768×768 recommended |
+| Frame rate | 1 FPS maximum |
+
+This works well for visual context (showing a product, sharing a document) but isn't suitable for real-time action recognition.
+
+#### Model Architectures
+
+Two fundamentally different architectures power voice AI:
+
+**Native Audio Models** process audio end-to-end without text intermediates:
 
 | Feature | Support |
 |---------|---------|
 | Natural prosody | Yes - more human-like speech |
 | Response modality | AUDIO only |
 | Proactive audio | Yes |
-| Affective dialog | Yes |
+| Affective dialog | Yes (emotional adaptation) |
 | Voices | Extended library (30+) |
 
 **Model**: `gemini-2.5-flash-native-audio-preview-12-2025`
 
-#### Half-Cascade Models
-
-Hybrid architecture with native audio input and TTS output:
+**Half-Cascade Models** convert audio to text, process it, then synthesize speech:
 
 | Feature | Support |
 |---------|---------|
@@ -559,9 +664,72 @@ Hybrid architecture with native audio input and TTS output:
 | Affective dialog | No |
 | Voices | 8 prebuilt voices |
 
-**Model**: `gemini-2.0-flash-live-001` (deprecated)
+**Model**: `gemini-2.0-flash-live-001` (deprecated December 2025)
 
-> **Recommendation**: Use native audio models for voice-first applications with natural conversation flow.
+#### Advanced Features
+
+- **Audio transcription**: Enabled by default. Both user speech and model speech are transcribed.
+- **Voice Activity Detection**: Automatically detects when users start and stop speaking. No manual signaling needed.
+- **Voice configuration**: Select from available voices per-agent or globally in RunConfig.
+
+> **Choosing the right model:** For natural conversation with emotional awareness, use native audio. For applications prioritizing tool execution reliability or needing text output, use half-cascade until you've tested thoroughly with native audio.
+
+### 2.7 Real-World Example: Voice Search
+
+Let's trace a complete interaction to see how these pieces work together. A user asks: *"What's the weather in Tokyo?"*
+
+```mermaid
+sequenceDiagram
+    participant User as 🎤 User
+    participant Browser as 🌐 Browser
+    participant Server as 🖥️ Server
+    participant API as ☁️ Live API
+    participant Tool as 🔍 Google Search
+
+    Note over User,Browser: 1. Audio Capture → Queue
+    User->>Browser: Speaks "What's the weather in Tokyo?"
+    Browser->>Server: Binary audio chunks (16kHz PCM)
+    Server->>API: send_realtime(audio_blob)
+
+    Note over API: 2. VAD Detection
+    API->>API: Detects speech ended
+
+    Note over API,Server: 3. Transcription Event
+    API->>Server: input_transcription: "What's the weather in Tokyo?"
+    Server->>Browser: JSON event
+
+    Note over API,Tool: 4. Tool Execution
+    API->>Server: Tool call: google_search("weather Tokyo")
+    Server->>Tool: Execute search (automatic)
+    Tool->>Server: Search results
+    Server->>API: Tool response
+
+    Note over API,Browser: 5. Audio Response
+    API->>Server: Audio chunks (24kHz PCM)
+    Server->>Browser: JSON events with inline_data
+    Browser->>User: "The weather in Tokyo is currently 22 degrees..."
+
+    Note over API,Browser: 6. Turn Complete
+    API->>Server: turn_complete: true
+    Server->>Browser: JSON event
+    Browser->>Browser: Hide typing indicator
+```
+
+**Step-by-step breakdown:**
+
+1. **Audio Capture → Queue**: The browser captures microphone input at 16kHz, converts to PCM chunks, and sends via WebSocket. Your server receives the binary frames and calls `live_request_queue.send_realtime(audio_blob)`.
+
+2. **VAD Detection**: The Live API's Voice Activity Detection notices the user stopped speaking. It triggers processing of the accumulated audio.
+
+3. **Transcription Event**: You receive an event with `input_transcription.text = "What's the weather in Tokyo?"`. Display this in the chat UI so users see their words recognized.
+
+4. **Tool Execution**: The model decides to call the `google_search` tool. You receive a tool call event, ADK executes the search automatically, and a tool response event follows with the weather data.
+
+5. **Audio Response**: The model generates a spoken response. Audio chunks arrive as events with `inline_data`. Your client feeds them to an AudioWorklet for real-time playback: *"The weather in Tokyo is currently 22 degrees and sunny."*
+
+6. **Turn Complete**: Finally, an event arrives with `turn_complete=True`. The UI can remove the "..." indicator to show the agent finished talking.
+
+> **This entire flow takes under two seconds.** The user experiences it as natural conversation, unaware of the LiveRequestQueue, Event types, and session management happening beneath the surface.
 
 ---
 
@@ -1527,6 +1695,16 @@ Try these experiments and observe the differences:
 | Vertex AI Live API | https://cloud.google.com/vertex-ai/generative-ai/docs/live-api |
 | ADK Samples Repository | https://github.com/google/adk-samples |
 | Google AI Studio | https://aistudio.google.com |
+
+**ADK Bidi-streaming Developer Guide (5-Part Series):**
+
+| Part | Focus | What You'll Learn |
+|------|-------|-------------------|
+| [Part 1](https://google.github.io/adk-docs/streaming/dev-guide/part1/) | Foundation | Architecture, Live API platforms, 4-phase lifecycle |
+| [Part 2](https://google.github.io/adk-docs/streaming/dev-guide/part2/) | Upstream | Sending text, audio, video via LiveRequestQueue |
+| [Part 3](https://google.github.io/adk-docs/streaming/dev-guide/part3/) | Downstream | Event handling, tool execution, multi-agent workflows |
+| [Part 4](https://google.github.io/adk-docs/streaming/dev-guide/part4/) | Configuration | Session management, quotas, production controls |
+| [Part 5](https://google.github.io/adk-docs/streaming/dev-guide/part5/) | Multimodal | Audio specs, model architectures, advanced features |
 
 ### 6.3 Next Steps
 
