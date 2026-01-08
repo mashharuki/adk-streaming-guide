@@ -91,33 +91,47 @@ Alternatively:
 - Go to [shell.cloud.google.com](https://shell.cloud.google.com)
 - Click "Open Editor" in the toolbar
 
+![](assets/cloud_shell_editor.png)
+
 **Step 2: Clone the Repository**
 
 Open a terminal in Cloud Shell Editor (Terminal → New Terminal) and run:
 
 ```bash
 git clone https://github.com/google/adk-samples.git
-cd adk-samples/python/agents/bidi-demo
 ```
 
-**Step 3: Configure Environment Variables**
+![](assets/clone_repository.png)
 
-Create your environment file:
+**Step 3: Open the bidi-demo Folder**
 
-```bash
-cp app/.env.example app/.env
-```
+In Cloud Shell Editor, open the bidi-demo project folder:
 
-Edit `app/.env` and add your Google AI Studio API key:
+1. Click **File** → **Open Folder** in the menu bar
+2. Navigate to `adk-samples/python/agents/bidi-demo`
+3. Click **OK**
+
+**Step 4: Configure Environment Variables**
+
+Create a new `.env` file in the `app/` directory:
+
+1. Right-click on the `app` folder in the Explorer panel
+2. Select **New File**
+3. Name it `.env`
+4. Add the following content:
 
 ```bash
 GOOGLE_API_KEY=your_api_key_here
 DEMO_AGENT_MODEL=gemini-2.5-flash-native-audio-preview-12-2025
 ```
 
-> **Getting an API Key**: Visit [aistudio.google.com](https://aistudio.google.com) → Get API Key → Create API key
+Replace `your_api_key_here` with your actual Google AI Studio API key.
 
-**Step 4: Install Dependencies**
+> **Getting an API Key**: Visit [aistudio.google.com](https://aistudio.google.com) → Get API Key (at the bottom left) → Create API key
+
+**Step 5: Install Dependencies**
+
+Open a terminal in Cloud Shell Editor (Terminal → New Terminal) and run:
 
 ```bash
 pip install -e .
@@ -164,6 +178,45 @@ bidi-demo/
 | `app/static/js/audio-*.js` | Client-side: Audio capture and playback with Web Audio API |
 
 Take a moment to open these files in the editor. We'll walk through them in detail in Section 4.
+
+### 1.4 Run the Demo
+
+Let's verify your setup by running the demo application.
+
+**Step 1: Start the Server**
+
+In the terminal, navigate to the app directory and start the server:
+
+```bash
+cd app
+python -m uvicorn main:app --reload --host 0.0.0.0 --port 8080
+```
+
+You should see output like:
+```
+INFO:     Will watch for changes in these directories: ['/home/kazsato/adk-samples/python/agents/bidi-demo/app']
+INFO:     Uvicorn running on http://0.0.0.0:8080 (Press CTRL+C to quit)
+INFO:     Started reloader process [9896] using WatchFiles
+INFO:     Started server process [9898]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+```
+
+**Step 2: Open the Web Preview**
+
+1. In Cloud Shell Editor, click the **Web Preview** button (globe icon) in the toolbar
+2. Select **Preview on port 8080**
+3. A new browser tab opens with the bidi-demo UI
+
+![](assets/web_preview.png)
+
+**Step 3: Test the Connection**
+
+Type a message like "Hello!" in the text input and click **Send**. If everything is configured correctly, you should receive a response from the agent.
+
+> **Tip**: Keep the server running for the rest of the workshop. You can open a new terminal (Terminal → New Terminal) if you need to run other commands.
+
+![](assets/say_hello.png)
 
 ---
 
@@ -520,7 +573,7 @@ Navigate to the app directory and start the FastAPI server:
 
 ```bash
 cd app
-uvicorn main:app --host 0.0.0.0 --port 8080
+python -m uvicorn main:app --reload --host 0.0.0.0 --port 8080
 ```
 
 You should see output like:
@@ -1352,7 +1405,7 @@ agent = Agent(
 
 ```bash
 # Stop the current server (Ctrl+C)
-uvicorn main:app --host 0.0.0.0 --port 8080
+python -m uvicorn main:app --reload --host 0.0.0.0 --port 8080
 ```
 
 ### 5.2 Add a Custom Tool
