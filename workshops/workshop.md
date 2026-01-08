@@ -1,25 +1,12 @@
 # ADK Bidi-streaming Workshop
 
-**Duration:** 1.5 hours (90 minutes)
-**Environment:** Google Cloud Shell Editor
-**Demo Application:** bidi-demo
-
----
-
 ## Workshop Overview
 
-This hands-on workshop teaches you how to build real-time, bidirectional streaming AI applications using Google's [Agent Development Kit (ADK)](https://google.github.io/adk-docs/). You will deploy and explore the bidi-demo application on [Cloud Shell Editor](https://cloud.google.com/shell/docs/editor-overview), learning the core concepts of ADK Bidi-streaming through practical experimentation.
+### What is Bidi-streaming?
 
-![ADK Bidi-streaming Demo](../docs/assets/bidi-demo-screen.png)
+Bidi-streaming (Bidirectional streaming) represents a fundamental shift from traditional AI interactions. Instead of the rigid "ask-and-wait" pattern, it enables **real-time, two-way communication** where both human and AI can speak, listen, and respond simultaneously. This creates natural, human-like conversations with immediate responses and the ability to interrupt ongoing interactions.
 
-### What is ADK Bidi-streaming?
-
-ADK Bidi-streaming enables real-time, two-way communication between your application and [Gemini](https://deepmind.google/technologies/gemini/) models through the [Live API](https://ai.google.dev/gemini-api/docs/live). Unlike traditional request-response patterns, bidirectional streaming allows:
-
-- **Continuous input streaming**: Send audio, text, and images in real-time without waiting for responses
-- **Concurrent output streaming**: Receive model responses, transcriptions, and events while still sending input
-- **Natural conversations**: Enable voice-based interactions with sub-second latency
-- **Multimodal experiences**: Combine text, audio, images, and video in a single session
+Think of the difference between sending emails and having a phone conversation. Traditional AI interactions are like emails—you send a complete message, wait for a complete response, then send another. Bidi-streaming is like a phone conversation—fluid, natural, with the ability to interrupt, clarify, and respond in real-time.
 
 ```mermaid
 sequenceDiagram
@@ -39,11 +26,59 @@ The diagram above shows a key feature of Bidi-streaming: **interruption**. The u
 
 ### Real-World Use Cases
 
-- Voice assistants and conversational AI
-- Real-time translation and transcription
-- Interactive customer service agents
-- Multimodal AI applications with camera/screen sharing
-- Accessibility tools with voice interfaces
+- **Customer Service**: A customer shows their defective coffee machine via phone camera while explaining the issue. The AI identifies the model and failure point, and the customer can interrupt to correct details mid-conversation.
+
+- **E-commerce**: A shopper holds up clothing to their webcam asking "Find shoes that match these pants." The agent analyzes the style and engages in fluid back-and-forth: "Show me something more casual" → "How about these sneakers?" → "Add the blue ones in size 10."
+
+- **Field Service**: A technician wearing smart glasses streams their view while asking "I'm hearing a strange noise from this compressor—can you identify it?" The agent provides step-by-step guidance hands-free.
+
+- **Healthcare**: A patient shares a live video of a skin condition. The AI performs preliminary analysis, asks clarifying questions, and guides next steps.
+
+- **Financial Services**: A client reviews their portfolio while the agent displays charts and simulates trade impacts. The client can share their screen to discuss specific news articles.
+
+**Shopper's Concierge 2 Demo**: Real-time Agentic RAG demo for e-commerce, built with [ADK Bidi-streaming](https://google.github.io/adk-docs/streaming/dev-guide/part1/) and Vertex AI Vector Search, Embeddings, Feature Store and Ranking API
+
+[![Shopper's Concierge 2 Demo](https://img.youtube.com/vi/Hwx94smxT_0/maxresdefault.jpg)](https://www.youtube.com/watch?v=Hwx94smxT_0)
+
+### What is ADK Bidi-streaming?
+
+Building real-time voice AI is hard. You need WebSocket connections that stay alive, audio streaming that doesn't lag, interruption handling that feels natural, and session state that persists across reconnections. The complexity adds up fast—what should take weeks often stretches into months of infrastructure work. ADK lets you skip all that plumbing and focus on what actually matters: your agent's behavior and your users' experience.
+
+![](assets/bidi_plumbing.webp)
+
+ADK Bidi-streaming enables real-time, two-way communication between your application and [Gemini](https://deepmind.google/technologies/gemini/) models through the [Live API](https://ai.google.dev/gemini-api/docs/live). Unlike traditional request-response patterns, bidirectional streaming allows:
+
+- **Continuous input streaming**: Send audio, text, and images in real-time without waiting for responses
+- **Concurrent output streaming**: Receive model responses, transcriptions, and events while still sending input
+- **Natural conversations**: Enable voice-based interactions with sub-second latency
+- **Multimodal experiences**: Combine text, audio, images, and video in a single session
+
+For a comprehensive deep-dive, we provide the [ADK Bidi-streaming Developer Guide](https://google.github.io/adk-docs/streaming/dev-guide/part1/)—a 5-part series covering architecture to production deployment:
+
+| Part | Focus | What You'll Learn |
+|------|-------|-------------------|
+| [Part 1](https://google.github.io/adk-docs/streaming/dev-guide/part1/) | Foundation | Architecture, Live API platforms, 4-phase lifecycle |
+| [Part 2](https://google.github.io/adk-docs/streaming/dev-guide/part2/) | Upstream | Sending text, audio, video via LiveRequestQueue |
+| [Part 3](https://google.github.io/adk-docs/streaming/dev-guide/part3/) | Downstream | Event handling, tool execution, multi-agent workflows |
+| [Part 4](https://google.github.io/adk-docs/streaming/dev-guide/part4/) | Configuration | Session management, quotas, production controls |
+| [Part 5](https://google.github.io/adk-docs/streaming/dev-guide/part5/) | Multimodal | Audio specs, model architectures, advanced features |
+
+### ADK Bidi-streaming hands-on workshop
+
+This hands-on workshop teaches you how to build real-time, bidirectional streaming AI applications based on the dev guide. You will deploy and explore the bidi-demo application on [Cloud Shell Editor](https://cloud.google.com/shell/docs/editor-overview), learning the core concepts of ADK Bidi-streaming through practical experimentation.
+
+![ADK Bidi-streaming Demo](../docs/assets/bidi-demo-screen.png)
+
+### Learning Objectives
+
+By the end of this workshop, you will be able to:
+
+1. Set up and run a Bidi-streaming application on Cloud Shell
+2. Understand ADK's 4-phase streaming lifecycle
+3. Learn how to implement bidirectional communication with LiveRequestQueue
+4. Process streaming events from run_live()
+5. Configure RunConfig for different modalities
+6. Work with audio, image, and video inputs
 
 ### Prerequisites
 
@@ -53,33 +88,13 @@ The diagram above shows a key feature of Bidi-streaming: **interruption**. The u
 - Familiarity with [async/await](https://docs.python.org/3/library/asyncio.html) concepts
 - Web browser with microphone access (Chrome recommended)
 
-### Learning Objectives
-
-By the end of this workshop, you will be able to:
-
-1. Understand ADK's 4-phase streaming lifecycle
-2. Set up and run a Bidi-streaming application on Cloud Shell
-3. Implement bidirectional communication with LiveRequestQueue
-4. Process streaming events from run_live()
-5. Configure RunConfig for different modalities
-6. Work with audio, image, and video inputs
-
 ---
 
 ## Section 1: Introduction & Environment Setup (10 min)
 
-### 1.1 Workshop Introduction
+To help you understand the concepts in this guide, we provide a working demo application that showcases ADK bidirectional streaming in action. This FastAPI-based demo implements the complete streaming lifecycle with a practical, real-world architecture.
 
-Welcome to the ADK Bidi-streaming workshop! In this session, you'll learn how to build real-time streaming AI applications that can handle voice conversations, process images, and respond with natural speech.
-
-The demo application you'll work with is a fully functional voice assistant that demonstrates:
-
-- Text and voice input
-- Audio responses with transcription
-- Image capture and analysis
-- Google Search integration
-
-### 1.2 Cloud Shell Editor Setup
+### 1.1 Cloud Shell Editor Setup
 
 Cloud Shell Editor provides a browser-based development environment with VS Code functionality. No local setup required!
 
@@ -143,7 +158,7 @@ This installs the bidi-demo package and all required dependencies including:
 - [`uvicorn`](https://www.uvicorn.org/) - ASGI server
 - [`python-dotenv`](https://pypi.org/project/python-dotenv/) - Environment variable management
 
-### 1.3 Understanding the Directory Structure
+### 1.2 Understanding the Directory Structure
 
 After cloning, explore the project structure in Cloud Shell Editor:
 
@@ -179,7 +194,7 @@ bidi-demo/
 
 Take a moment to open these files in the editor. We'll walk through them in detail in Section 4.
 
-### 1.4 Run the Demo
+### 1.3 Run the Demo
 
 Let's verify your setup by running the demo application.
 
@@ -291,24 +306,32 @@ When your server starts, you create three foundational components that live for 
 ```python
 # bidi-demo/app/google_search_agent/agent.py:5-18
 from google.adk.agents import Agent
-from google.adk.tools import google_search
+from google.adk.tools import google_search  # Built-in tool for web search
 
 agent = Agent(
-    name="google_search_agent",
-    model="gemini-2.5-flash-native-audio-preview-12-2025",
-    instruction="You are a helpful assistant that can search the web.",
-    tools=[google_search]
+    name="google_search_agent",           # Unique identifier for this agent
+    model="gemini-2.5-flash-native-audio-preview-12-2025",  # Native audio model
+    instruction="You are a helpful assistant that can search the web.",  # System prompt
+    tools=[google_search]                 # Tools the agent can use
 )
 ```
+
+This creates an Agent with a native audio model that can understand and respond with speech, equipped with Google Search capability for real-time information retrieval.
 
 ```python
 # bidi-demo/app/main.py:50-53
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 
-session_service = InMemorySessionService()
-runner = Runner(app_name="bidi-demo", agent=agent, session_service=session_service)
+session_service = InMemorySessionService()  # Stores sessions in memory (use SQL for production)
+runner = Runner(
+    app_name="bidi-demo",       # Application identifier
+    agent=agent,                # The agent to run
+    session_service=session_service  # Where to persist conversation history
+)
 ```
+
+The Runner orchestrates all sessions. A single Runner instance handles thousands of concurrent users because per-user state is managed by the SessionService.
 
 #### Phase 2: Session Initialization (Per User Connection)
 
@@ -323,12 +346,14 @@ When a user connects (e.g., via WebSocket), you initialize their streaming sessi
 ```python
 # bidi-demo/app/main.py:114-163
 run_config = RunConfig(
-    streaming_mode=StreamingMode.BIDI,
-    response_modalities=["AUDIO"]
+    streaming_mode=StreamingMode.BIDI,  # Enable bidirectional streaming
+    response_modalities=["AUDIO"]       # Model responds with speech
 )
 
-live_request_queue = LiveRequestQueue()
+live_request_queue = LiveRequestQueue()  # Create channel for sending input to model
 ```
+
+The RunConfig defines session behavior, while LiveRequestQueue is the channel through which all user input flows to the model.
 
 #### Phase 3: Bidi-streaming (Active Session)
 
@@ -359,7 +384,8 @@ When the connection ends—whether the user disconnects, a timeout occurs, or an
 ```python
 # bidi-demo/app/main.py:246-253
 finally:
-    # Always close the queue to terminate the Live API session
+    # Always close the queue to terminate the Live API session gracefully.
+    # This signals the model to stop processing and releases resources.
     live_request_queue.close()
 ```
 
@@ -380,12 +406,14 @@ from google.adk.tools import google_search
 
 agent = Agent(
     name="search_agent",
-    model="gemini-2.5-flash-native-audio-preview-12-2025",
+    model="gemini-2.5-flash-native-audio-preview-12-2025",  # Supports voice I/O
     instruction="""You are a helpful assistant with access to Google Search.
     When users ask questions, search for current information when needed.""",
-    tools=[google_search]
+    tools=[google_search]  # Agent can call this tool automatically
 )
 ```
+
+The `instruction` field is your system prompt—it shapes the agent's personality and behavior. The `tools` list defines what capabilities the agent has beyond conversation.
 
 #### LiveRequestQueue
 
@@ -441,21 +469,24 @@ graph LR
 
 ```python
 # bidi-demo/app/main.py:169-217
-# Send text
+
+# Send text - wraps text in Content object and signals a complete turn
 content = types.Content(parts=[types.Part(text="Hello!")])
-live_request_queue.send_content(content)
+live_request_queue.send_content(content)  # Triggers immediate model response
 
-# Send audio
+# Send audio - streams raw PCM bytes in small chunks
 audio_blob = types.Blob(mime_type="audio/pcm;rate=16000", data=audio_bytes)
-live_request_queue.send_realtime(audio_blob)
+live_request_queue.send_realtime(audio_blob)  # Non-blocking, buffers automatically
 
-# Send image
+# Send image - same method for any realtime media
 image_blob = types.Blob(mime_type="image/jpeg", data=image_bytes)
 live_request_queue.send_realtime(image_blob)
 
-# Close session
+# Close session - always call this to release resources
 live_request_queue.close()
 ```
+
+Note the difference: `send_content()` is for complete turn-based messages, while `send_realtime()` is for continuous streaming data.
 
 #### run_live()
 
@@ -468,14 +499,17 @@ You call it with three inputs: **identity** (user_id and session_id), **channel*
 ```python
 # bidi-demo/app/main.py:225-233
 async for event in runner.run_live(
-    user_id=user_id,
-    session_id=session_id,
-    live_request_queue=live_request_queue,
-    run_config=run_config
+    user_id=user_id,              # Identifies the user
+    session_id=session_id,        # Identifies the conversation
+    live_request_queue=live_request_queue,  # Channel for upstream input
+    run_config=run_config         # Streaming configuration
 ):
-    # Process each event as it arrives
+    # Events arrive in real-time as the model generates responses
+    # Convert to JSON and forward to the client via WebSocket
     await websocket.send_text(event.model_dump_json())
 ```
+
+The `async for` loop yields events as they arrive—text chunks, audio data, transcriptions, tool calls, and control signals. Each event is immediately forwarded to the client.
 
 **The Seven Event Types:**
 
@@ -557,6 +591,8 @@ run_config = RunConfig(
 )
 ```
 
+This configuration enables full voice interaction with transcription, session resumption for reconnection handling, and advanced native audio features for natural conversation.
+
 ### 2.5 Client-Side: WebSocket Connection
 
 While the server handles ADK communication, the client manages the WebSocket connection and user interface. Here's how the client connects:
@@ -565,25 +601,26 @@ While the server handles ADK communication, the client manages the WebSocket con
 
 ```javascript
 // bidi-demo/app/static/js/app.js:10-12
-// Generate unique session ID for this browser session
-const userId = "demo-user";
-const sessionId = "demo-session-" + Math.random().toString(36).substring(7);
-let websocket = null;
+const userId = "demo-user";  // In production, use authenticated user ID
+const sessionId = "demo-session-" + Math.random().toString(36).substring(7);  // Unique per tab
+let websocket = null;  // WebSocket connection instance
 ```
+
+Each browser tab gets a unique session ID, allowing multiple concurrent conversations per user.
 
 ```javascript
 // bidi-demo/app/static/js/app.js:37-55
-// Build WebSocket URL with optional RunConfig parameters
 function getWebSocketUrl() {
+    // Construct URL: ws://host/ws/{user_id}/{session_id}
     const baseUrl = "ws://" + window.location.host + "/ws/" + userId + "/" + sessionId;
     const params = new URLSearchParams();
 
-    // Add optional features as query parameters
+    // Pass RunConfig options as query parameters to the server
     if (enableProactivityCheckbox.checked) {
-        params.append("proactivity", "true");
+        params.append("proactivity", "true");  // Enable proactive responses
     }
     if (enableAffectiveDialogCheckbox.checked) {
-        params.append("affective_dialog", "true");
+        params.append("affective_dialog", "true");  // Enable emotional awareness
     }
 
     const queryString = params.toString();
@@ -591,35 +628,36 @@ function getWebSocketUrl() {
 }
 ```
 
+This URL pattern embeds user/session IDs in the path, making it easy for the server to identify the conversation context.
+
 ```javascript
 // bidi-demo/app/static/js/app.js:317-730
-// Connect to the WebSocket server
 function connectWebsocket() {
     const ws_url = getWebSocketUrl();
-    websocket = new WebSocket(ws_url);
+    websocket = new WebSocket(ws_url);  // Establish WebSocket connection
 
     websocket.onopen = function() {
         console.log("WebSocket connection opened.");
-        updateConnectionStatus(true);
+        updateConnectionStatus(true);  // Update UI to show connected state
     };
 
     websocket.onmessage = function(event) {
-        // Parse ADK events from the server
+        // All ADK events arrive here as JSON
         const adkEvent = JSON.parse(event.data);
-        handleAdkEvent(adkEvent);
+        handleAdkEvent(adkEvent);  // Route to appropriate handler
     };
 
     websocket.onclose = function() {
         console.log("WebSocket connection closed.");
         updateConnectionStatus(false);
-        // Auto-reconnect after 5 seconds
-        setTimeout(connectWebsocket, 5000);
+        setTimeout(connectWebsocket, 5000);  // Auto-reconnect after 5 seconds
     };
 }
 
-// Start connection when page loads
-connectWebsocket();
+connectWebsocket();  // Connect immediately when page loads
 ```
+
+The auto-reconnect pattern ensures users stay connected even if there are brief network interruptions.
 
 **Key Points:**
 
@@ -920,27 +958,26 @@ Open `app/main.py` in the editor and examine the application initialization:
 
 ```python
 # bidi-demo/app/main.py:19-53
-# Load environment variables BEFORE importing agent
+
+# IMPORTANT: Load environment variables BEFORE importing agent
+# The agent reads DEMO_AGENT_MODEL at import time
 from dotenv import load_dotenv
 load_dotenv(Path(__file__).parent / ".env")
 
-# Import agent after loading environment variables
-from google_search_agent.agent import agent
+from google_search_agent.agent import agent  # Now safe to import
 
 # ========================================
 # Phase 1: Application Initialization (once at startup)
 # ========================================
 
-app = FastAPI()
+app = FastAPI()  # Web framework for HTTP and WebSocket
 
-# Mount static files for the web UI
+# Serve static files (HTML, CSS, JS) for the web UI
 static_dir = Path(__file__).parent / "static"
 app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
-# Session service manages conversation state
-session_service = InMemorySessionService()
-
-# Runner orchestrates agent execution
+# These are created ONCE and shared across ALL connections
+session_service = InMemorySessionService()  # Stores conversation history
 runner = Runner(app_name=APP_NAME, agent=agent, session_service=session_service)
 ```
 
@@ -956,44 +993,46 @@ Examine the WebSocket endpoint where sessions are initialized:
 
 ```python
 # bidi-demo/app/main.py:71-163
+
+# WebSocket endpoint - path parameters capture user/session IDs
 @app.websocket("/ws/{user_id}/{session_id}")
 async def websocket_endpoint(
     websocket: WebSocket,
-    user_id: str,
-    session_id: str,
-    proactivity: bool = False,
-    affective_dialog: bool = False,
+    user_id: str,                    # From URL path
+    session_id: str,                 # From URL path
+    proactivity: bool = False,       # From query param ?proactivity=true
+    affective_dialog: bool = False,  # From query param ?affective_dialog=true
 ) -> None:
-    await websocket.accept()
+    await websocket.accept()  # Complete WebSocket handshake
 
     # ========================================
-    # Phase 2: Session Initialization
+    # Phase 2: Session Initialization (runs for EACH connection)
     # ========================================
 
-    # Detect model architecture
+    # Auto-detect model type to configure appropriate response modality
     model_name = agent.model
     is_native_audio = "native-audio" in model_name.lower()
 
     if is_native_audio:
-        # Native audio: AUDIO response, full features
+        # Native audio models: respond with speech, enable advanced features
         run_config = RunConfig(
             streaming_mode=StreamingMode.BIDI,
-            response_modalities=["AUDIO"],
-            input_audio_transcription=types.AudioTranscriptionConfig(),
-            output_audio_transcription=types.AudioTranscriptionConfig(),
+            response_modalities=["AUDIO"],  # Model responds with voice
+            input_audio_transcription=types.AudioTranscriptionConfig(),   # Transcribe user speech
+            output_audio_transcription=types.AudioTranscriptionConfig(),  # Transcribe model speech
             proactivity=(
                 types.ProactivityConfig(proactive_audio=True) if proactivity else None
             ),
             enable_affective_dialog=affective_dialog if affective_dialog else None,
         )
     else:
-        # Half-cascade: TEXT response for speed
+        # Half-cascade models: respond with text for faster performance
         run_config = RunConfig(
             streaming_mode=StreamingMode.BIDI,
-            response_modalities=["TEXT"],
+            response_modalities=["TEXT"],  # Model responds with text
         )
 
-    # Get or create session
+    # Restore existing session or create new one
     session = await session_service.get_session(
         app_name=APP_NAME, user_id=user_id, session_id=session_id
     )
@@ -1002,7 +1041,7 @@ async def websocket_endpoint(
             app_name=APP_NAME, user_id=user_id, session_id=session_id
         )
 
-    # Create the request queue for this session
+    # Create fresh queue for this connection's upstream messages
     live_request_queue = LiveRequestQueue()
 ```
 
@@ -1021,38 +1060,40 @@ The upstream task handles all incoming messages from the client:
 # bidi-demo/app/main.py:169-217
 async def upstream_task() -> None:
     """Receives messages from WebSocket and sends to LiveRequestQueue."""
-    while True:
-        message = await websocket.receive()
+    while True:  # Runs continuously until connection closes
+        message = await websocket.receive()  # Wait for next WebSocket frame
 
-        # Handle binary frames (audio data)
+        # Binary frames = raw audio bytes (most efficient for streaming)
         if "bytes" in message:
             audio_data = message["bytes"]
             audio_blob = types.Blob(
-                mime_type="audio/pcm;rate=16000",
+                mime_type="audio/pcm;rate=16000",  # 16kHz mono PCM required
                 data=audio_data
             )
-            live_request_queue.send_realtime(audio_blob)
+            live_request_queue.send_realtime(audio_blob)  # Stream to model
 
-        # Handle text frames (JSON messages)
+        # Text frames = JSON messages (text input, images, etc.)
         elif "text" in message:
             json_message = json.loads(message["text"])
 
-            # Text message
+            # User typed a message
             if json_message.get("type") == "text":
                 content = types.Content(
                     parts=[types.Part(text=json_message["text"])]
                 )
-                live_request_queue.send_content(content)
+                live_request_queue.send_content(content)  # Triggers model response
 
-            # Image message
+            # User captured an image
             elif json_message.get("type") == "image":
                 image_data = base64.b64decode(json_message["data"])
                 image_blob = types.Blob(
                     mime_type=json_message.get("mimeType", "image/jpeg"),
                     data=image_data
                 )
-                live_request_queue.send_realtime(image_blob)
+                live_request_queue.send_realtime(image_blob)  # Send for analysis
 ```
+
+This task bridges the WebSocket connection to the LiveRequestQueue, converting browser data formats to ADK types.
 
 **Key Points:**
 
@@ -1070,35 +1111,38 @@ The client sends text messages as JSON through the WebSocket:
 
 ```javascript
 // bidi-demo/app/static/js/app.js:755-766
-// Send a text message to the server
 function sendMessage(message) {
+    // Only send if connection is open
     if (websocket && websocket.readyState === WebSocket.OPEN) {
+        // Package as JSON with type identifier
         const jsonMessage = JSON.stringify({
-            type: "text",
+            type: "text",  // Server uses this to route the message
             text: message
         });
-        websocket.send(jsonMessage);
+        websocket.send(jsonMessage);  // Send as text frame
     }
 }
 ```
 
+The `type` field tells the server how to process the message—"text" for typed messages, "image" for captured frames.
+
 ```javascript
 // bidi-demo/app/static/js/app.js:734-752
-// Form submission handler
 messageForm.onsubmit = function(e) {
-    e.preventDefault();
+    e.preventDefault();  // Don't reload the page
     const message = messageInput.value.trim();
     if (message) {
-        // Add user message bubble to UI
+        // Show user's message in the UI immediately (optimistic update)
         const userBubble = createMessageBubble(message, true);
         messagesDiv.appendChild(userBubble);
 
-        // Clear input and send
-        messageInput.value = "";
-        sendMessage(message);
+        messageInput.value = "";  // Clear input field
+        sendMessage(message);     // Send to server
     }
 };
 ```
+
+The UI updates immediately when the user sends a message, providing instant feedback while the server processes the request.
 
 #### Client-Side: Sending Audio
 
@@ -1141,6 +1185,8 @@ export async function startAudioRecorderWorklet(audioRecorderHandler) {
 }
 ```
 
+The AudioWorklet runs on a separate audio thread, ensuring smooth capture without blocking the main UI thread.
+
 ```javascript
 // bidi-demo/app/static/js/audio-recorder.js:49-58
 // Convert Float32 samples to 16-bit PCM
@@ -1153,6 +1199,8 @@ function convertFloat32ToPCM(inputData) {
     return pcm16.buffer;
 }
 ```
+
+Web Audio provides Float32 samples (-1 to 1), but the Live API requires 16-bit PCM integers. This conversion is essential.
 
 **JavaScript (pcm-recorder-processor.js):**
 
@@ -1261,16 +1309,19 @@ The downstream task processes all events from the model:
 # bidi-demo/app/main.py:219-234
 async def downstream_task() -> None:
     """Receives Events from run_live() and sends to WebSocket."""
+    # run_live() is an async generator - yields events as they arrive
     async for event in runner.run_live(
         user_id=user_id,
         session_id=session_id,
-        live_request_queue=live_request_queue,
+        live_request_queue=live_request_queue,  # Same queue used by upstream task
         run_config=run_config,
     ):
-        # Serialize event to JSON and send to client
+        # Convert Pydantic model to JSON, excluding None fields for cleaner output
         event_json = event.model_dump_json(exclude_none=True, by_alias=True)
-        await websocket.send_text(event_json)
+        await websocket.send_text(event_json)  # Forward to browser
 ```
+
+This task runs concurrently with the upstream task. Events stream continuously as the model generates responses, enabling real-time UI updates.
 
 **Event Types You'll Receive:**
 
@@ -1287,23 +1338,26 @@ async def downstream_task() -> None:
 ```python
 # bidi-demo/app/main.py:225-233 (event processing example)
 async for event in runner.run_live(...):
-    # Text/Audio content
+    # Text or Audio content from the model
     if event.content and event.content.parts:
         for part in event.content.parts:
             if part.text:
+                # Text response (may arrive with partial=True for streaming)
                 print(f"Model text: {part.text}")
             if part.inline_data:
-                # Audio data (24kHz PCM)
+                # Audio response - raw bytes at 24kHz PCM
                 audio_bytes = part.inline_data.data
 
-    # User's speech transcribed
+    # User's speech transcribed to text
     if event.input_transcription and event.input_transcription.text:
         print(f"User said: {event.input_transcription.text}")
 
-    # Model's speech transcribed
+    # Model's speech transcribed to text (for display/logging)
     if event.output_transcription and event.output_transcription.text:
         print(f"Model said: {event.output_transcription.text}")
 ```
+
+This pattern shows how to extract different types of content from events. The same event may contain multiple fields.
 
 #### Client-Side: Receiving Events
 
@@ -1562,23 +1616,28 @@ Both tasks run simultaneously using `asyncio.gather()`:
 ```python
 # bidi-demo/app/main.py:236-253
 # ========================================
-# Phase 3: Active Session
+# Phase 3: Active Session (bidirectional communication)
 # ========================================
 
 try:
+    # Run both tasks concurrently - this is the heart of bidi-streaming
+    # upstream_task: WebSocket → LiveRequestQueue (user input)
+    # downstream_task: run_live() → WebSocket (model output)
     await asyncio.gather(upstream_task(), downstream_task())
 except WebSocketDisconnect:
-    logger.debug("Client disconnected normally")
+    logger.debug("Client disconnected normally")  # Expected when user closes tab
 except Exception as e:
-    logger.error(f"Unexpected error: {e}")
+    logger.error(f"Unexpected error: {e}")  # Log unexpected failures
 finally:
     # ========================================
-    # Phase 4: Session Termination
+    # Phase 4: Session Termination (cleanup)
     # ========================================
 
-    # ALWAYS close the queue
+    # CRITICAL: Always close the queue to release Live API resources
     live_request_queue.close()
 ```
+
+The `finally` block ensures cleanup happens even if an exception occurs. Forgetting to close the queue can lead to resource leaks.
 
 **Key Points:**
 
@@ -1602,7 +1661,10 @@ from google.adk.tools import google_search
 
 agent = Agent(
     name="my_custom_agent",
+    # Use environment variable with fallback for flexibility
     model=os.getenv("DEMO_AGENT_MODEL", "gemini-2.5-flash-native-audio-preview-12-2025"),
+
+    # The instruction is your system prompt - shapes personality and behavior
     instruction="""You are a friendly travel assistant named Aria.
 
     When helping users:
@@ -1612,9 +1674,12 @@ agent = Agent(
     - Provide practical tips for travelers
 
     Always maintain a warm, conversational tone.""",
-    tools=[google_search]
+
+    tools=[google_search]  # Tools the agent can call
 )
 ```
+
+Try changing the instruction to create different agent personalities—a tech support specialist, a language tutor, or a cooking assistant.
 
 **Restart the server** to apply changes:
 
@@ -1631,6 +1696,8 @@ Create a simple custom tool:
 # bidi-demo/app/google_search_agent/agent.py (custom tool example)
 from google.adk.tools import FunctionTool
 
+# Define a custom tool as a regular Python function
+# ADK automatically extracts the schema from type hints and docstring
 def get_current_time(timezone: str = "UTC") -> str:
     """Get the current time in a specified timezone.
 
@@ -1641,7 +1708,7 @@ def get_current_time(timezone: str = "UTC") -> str:
         The current time as a formatted string
     """
     from datetime import datetime
-    import pytz  # https://pypi.org/project/pytz/
+    import pytz  # pip install pytz
 
     try:
         tz = pytz.timezone(timezone)
@@ -1650,14 +1717,16 @@ def get_current_time(timezone: str = "UTC") -> str:
     except Exception as e:
         return f"Could not get time for timezone {timezone}: {str(e)}"
 
-# Add to agent
+# Add the function directly to tools - ADK wraps it automatically
 agent = Agent(
     name="my_agent",
     model=os.getenv("DEMO_AGENT_MODEL"),
     instruction="You are a helpful assistant with access to search and time tools.",
-    tools=[google_search, get_current_time]  # Add custom tool
+    tools=[google_search, get_current_time]  # Mix built-in and custom tools
 )
 ```
+
+ADK automatically calls your function when the model decides to use the tool. The docstring becomes the tool's description for the model.
 
 ### 5.3 Experiment with RunConfig
 
@@ -1670,7 +1739,9 @@ Try different configurations by modifying the WebSocket endpoint:
 run_config = RunConfig(
     streaming_mode=StreamingMode.BIDI,
     response_modalities=["AUDIO"],
+    # Proactivity: model can initiate responses without waiting for user input
     proactivity=types.ProactivityConfig(proactive_audio=True),
+    # Affective dialog: model adapts tone based on user's emotional state
     enable_affective_dialog=True,
 )
 ```
@@ -1687,15 +1758,18 @@ With proactivity enabled, the model may:
 run_config = RunConfig(
     streaming_mode=StreamingMode.BIDI,
     response_modalities=["AUDIO"],
+    # Configure the model's speaking voice
     speech_config=types.SpeechConfig(
         voice_config=types.VoiceConfig(
             prebuilt_voice_config=types.PrebuiltVoiceConfig(
-                voice_name="Kore"  # Try: Puck, Charon, Kore, Fenrir, Aoede
+                voice_name="Kore"  # Each voice has distinct personality
             )
         )
     ),
 )
 ```
+
+Voice selection affects the agent's perceived personality—experiment to find the right match for your use case.
 
 **Available Voices (Half-Cascade):**
 - Puck, Charon, Kore, Fenrir, Aoede, Leda, Orus, Zephyr
