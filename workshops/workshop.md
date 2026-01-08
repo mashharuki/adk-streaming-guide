@@ -289,20 +289,25 @@ When your server starts, you create three foundational components that live for 
 | **Runner** | Orchestrates agent execution |
 
 ```python
+# bidi-demo/app/google_search_agent/agent.py:5-18
 from google.adk.agents import Agent
+from google.adk.tools import google_search
+
+agent = Agent(
+    name="google_search_agent",
+    model="gemini-2.5-flash-native-audio-preview-12-2025",
+    instruction="You are a helpful assistant that can search the web.",
+    tools=[google_search]
+)
+```
+
+```python
+# bidi-demo/app/main.py:50-53
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 
-# Create once at startup
-agent = Agent(
-    name="my_agent",
-    model="gemini-2.5-flash-native-audio-preview-12-2025",
-    instruction="You are a helpful assistant.",
-    tools=[google_search]
-)
-
 session_service = InMemorySessionService()
-runner = Runner(app_name="my-app", agent=agent, session_service=session_service)
+runner = Runner(app_name="bidi-demo", agent=agent, session_service=session_service)
 ```
 
 #### Phase 2: Session Initialization (Per User Connection)
@@ -316,7 +321,7 @@ When a user connects (e.g., via WebSocket), you initialize their streaming sessi
 | **LiveRequestQueue** | Channel for sending input to the model |
 
 ```python
-# Create per connection
+# bidi-demo/app/main.py:114-163
 run_config = RunConfig(
     streaming_mode=StreamingMode.BIDI,
     response_modalities=["AUDIO"]
@@ -352,6 +357,7 @@ The user can speak while the AI is responding. The AI can be interrupted mid-sen
 When the connection ends—whether the user disconnects, a timeout occurs, or an error happens—you close the LiveRequestQueue. This sends a graceful termination signal, stops the run_live() loop, and ensures session state is persisted for future resumption.
 
 ```python
+# bidi-demo/app/main.py:246-253
 finally:
     # Always close the queue to terminate the Live API session
     live_request_queue.close()
@@ -368,6 +374,7 @@ finally:
 The Agent defines your AI assistant's personality and capabilities:
 
 ```python
+# bidi-demo/app/google_search_agent/agent.py:5-18
 from google.adk.agents import Agent
 from google.adk.tools import google_search
 
@@ -433,6 +440,7 @@ graph LR
 | `close()` | End the session | User disconnected |
 
 ```python
+# bidi-demo/app/main.py:169-217
 # Send text
 content = types.Content(parts=[types.Part(text="Hello!")])
 live_request_queue.send_content(content)
@@ -458,6 +466,7 @@ The return path—from the AI back to your application—centers on `run_live()`
 You call it with three inputs: **identity** (user_id and session_id), **channel** (the LiveRequestQueue for upstream messages), and **configuration** (RunConfig for streaming behavior). The method returns an async generator that yields Event objects as they arrive.
 
 ```python
+# bidi-demo/app/main.py:225-233
 async for event in runner.run_live(
     user_id=user_id,
     session_id=session_id,
@@ -524,6 +533,7 @@ One concept trips up many developers: ADK Session vs Live API session.
 > **Quota planning:** Gemini Live API allows 50-1,000 concurrent sessions depending on tier. Vertex AI supports up to 1,000 per project.
 
 ```python
+# bidi-demo/app/main.py:114-124
 from google.adk.agents.run_config import RunConfig, StreamingMode
 from google.genai import types
 
@@ -554,11 +564,15 @@ While the server handles ADK communication, the client manages the WebSocket con
 **JavaScript (app.js):**
 
 ```javascript
+// bidi-demo/app/static/js/app.js:10-12
 // Generate unique session ID for this browser session
 const userId = "demo-user";
 const sessionId = "demo-session-" + Math.random().toString(36).substring(7);
 let websocket = null;
+```
 
+```javascript
+// bidi-demo/app/static/js/app.js:37-55
 // Build WebSocket URL with optional RunConfig parameters
 function getWebSocketUrl() {
     const baseUrl = "ws://" + window.location.host + "/ws/" + userId + "/" + sessionId;
@@ -575,7 +589,10 @@ function getWebSocketUrl() {
     const queryString = params.toString();
     return queryString ? baseUrl + "?" + queryString : baseUrl;
 }
+```
 
+```javascript
+// bidi-demo/app/static/js/app.js:317-730
 // Connect to the WebSocket server
 function connectWebsocket() {
     const ws_url = getWebSocketUrl();
@@ -902,6 +919,7 @@ Take a short break. When you return, we'll dive into the code!
 Open `app/main.py` in the editor and examine the application initialization:
 
 ```python
+# bidi-demo/app/main.py:19-53
 # Load environment variables BEFORE importing agent
 from dotenv import load_dotenv
 load_dotenv(Path(__file__).parent / ".env")
@@ -937,6 +955,7 @@ runner = Runner(app_name=APP_NAME, agent=agent, session_service=session_service)
 Examine the WebSocket endpoint where sessions are initialized:
 
 ```python
+# bidi-demo/app/main.py:71-163
 @app.websocket("/ws/{user_id}/{session_id}")
 async def websocket_endpoint(
     websocket: WebSocket,
@@ -999,6 +1018,7 @@ async def websocket_endpoint(
 The upstream task handles all incoming messages from the client:
 
 ```python
+# bidi-demo/app/main.py:169-217
 async def upstream_task() -> None:
     """Receives messages from WebSocket and sends to LiveRequestQueue."""
     while True:
@@ -1049,6 +1069,7 @@ The client sends text messages as JSON through the WebSocket:
 **JavaScript (app.js):**
 
 ```javascript
+// bidi-demo/app/static/js/app.js:755-766
 // Send a text message to the server
 function sendMessage(message) {
     if (websocket && websocket.readyState === WebSocket.OPEN) {
@@ -1059,7 +1080,10 @@ function sendMessage(message) {
         websocket.send(jsonMessage);
     }
 }
+```
 
+```javascript
+// bidi-demo/app/static/js/app.js:734-752
 // Form submission handler
 messageForm.onsubmit = function(e) {
     e.preventDefault();
@@ -1083,6 +1107,7 @@ Audio capture uses Web Audio API with AudioWorklet for real-time processing:
 **JavaScript (audio-recorder.js):**
 
 ```javascript
+// bidi-demo/app/static/js/audio-recorder.js:7-38
 // Start audio recording worklet
 export async function startAudioRecorderWorklet(audioRecorderHandler) {
     // Create AudioContext at 16kHz (required by Live API)
@@ -1114,7 +1139,10 @@ export async function startAudioRecorderWorklet(audioRecorderHandler) {
 
     return [audioRecorderNode, audioRecorderContext, micStream];
 }
+```
 
+```javascript
+// bidi-demo/app/static/js/audio-recorder.js:49-58
 // Convert Float32 samples to 16-bit PCM
 function convertFloat32ToPCM(inputData) {
     const pcm16 = new Int16Array(inputData.length);
@@ -1129,6 +1157,7 @@ function convertFloat32ToPCM(inputData) {
 **JavaScript (pcm-recorder-processor.js):**
 
 ```javascript
+// bidi-demo/app/static/js/pcm-recorder-processor.js:1-18
 // AudioWorklet processor for capturing microphone audio
 class PCMProcessor extends AudioWorkletProcessor {
     process(inputs, outputs, parameters) {
@@ -1149,6 +1178,7 @@ registerProcessor("pcm-recorder-processor", PCMProcessor);
 **JavaScript (app.js) - Sending audio chunks:**
 
 ```javascript
+// bidi-demo/app/static/js/app.js:979-988
 // Audio recorder handler - called for each audio chunk
 function audioRecorderHandler(pcmData) {
     if (websocket && websocket.readyState === WebSocket.OPEN && is_audio) {
@@ -1165,6 +1195,7 @@ Images are captured from the camera, converted to JPEG, and sent as base64:
 **JavaScript (app.js):**
 
 ```javascript
+// bidi-demo/app/static/js/app.js:803-830
 // Open camera and start preview
 async function openCameraPreview() {
     cameraStream = await navigator.mediaDevices.getUserMedia({
@@ -1177,7 +1208,10 @@ async function openCameraPreview() {
     cameraPreview.srcObject = cameraStream;
     cameraModal.classList.add('show');
 }
+```
 
+```javascript
+// bidi-demo/app/static/js/app.js:848-903
 // Capture image from the live preview
 function captureImageFromPreview() {
     // Create canvas to capture the frame
@@ -1202,7 +1236,10 @@ function captureImageFromPreview() {
 
     closeCameraPreview();
 }
+```
 
+```javascript
+// bidi-demo/app/static/js/app.js:906-916
 // Send image to server as JSON
 function sendImage(base64Image) {
     if (websocket && websocket.readyState === WebSocket.OPEN) {
@@ -1221,6 +1258,7 @@ function sendImage(base64Image) {
 The downstream task processes all events from the model:
 
 ```python
+# bidi-demo/app/main.py:219-234
 async def downstream_task() -> None:
     """Receives Events from run_live() and sends to WebSocket."""
     async for event in runner.run_live(
@@ -1247,6 +1285,7 @@ async def downstream_task() -> None:
 **Processing Specific Events:**
 
 ```python
+# bidi-demo/app/main.py:225-233 (event processing example)
 async for event in runner.run_live(...):
     # Text/Audio content
     if event.content and event.content.parts:
@@ -1273,6 +1312,7 @@ The client processes all ADK events received from the WebSocket:
 **JavaScript (app.js) - Main event handler:**
 
 ```javascript
+// bidi-demo/app/static/js/app.js:341-690
 websocket.onmessage = function(event) {
     const adkEvent = JSON.parse(event.data);
 
@@ -1364,7 +1404,10 @@ websocket.onmessage = function(event) {
         }
     }
 };
+```
 
+```javascript
+// bidi-demo/app/static/js/app.js:770-787
 // Decode base64 to ArrayBuffer (handles base64url encoding)
 function base64ToArray(base64) {
     // Convert base64url to standard base64
@@ -1391,6 +1434,7 @@ Audio playback uses a ring buffer to handle streaming audio smoothly:
 **JavaScript (audio-player.js):**
 
 ```javascript
+// bidi-demo/app/static/js/audio-player.js:5-24
 // Start audio playback worklet
 export async function startAudioPlayerWorklet() {
     // Create AudioContext at 24kHz (Live API output format)
@@ -1411,6 +1455,7 @@ export async function startAudioPlayerWorklet() {
 **JavaScript (pcm-player-processor.js):**
 
 ```javascript
+// bidi-demo/app/static/js/pcm-player-processor.js:5-75
 // AudioWorklet processor for playing streaming PCM audio
 class PCMPlayerProcessor extends AudioWorkletProcessor {
     constructor() {
@@ -1515,6 +1560,7 @@ graph LR
 Both tasks run simultaneously using `asyncio.gather()`:
 
 ```python
+# bidi-demo/app/main.py:236-253
 # ========================================
 # Phase 3: Active Session
 # ========================================
@@ -1549,6 +1595,7 @@ finally:
 Open `app/google_search_agent/agent.py` and customize the agent:
 
 ```python
+# bidi-demo/app/google_search_agent/agent.py:1-18 (customization example)
 import os
 from google.adk.agents import Agent
 from google.adk.tools import google_search
@@ -1581,6 +1628,7 @@ python -m uvicorn main:app --reload --host 0.0.0.0 --port 8080
 Create a simple custom tool:
 
 ```python
+# bidi-demo/app/google_search_agent/agent.py (custom tool example)
 from google.adk.tools import FunctionTool
 
 def get_current_time(timezone: str = "UTC") -> str:
@@ -1618,6 +1666,7 @@ Try different configurations by modifying the WebSocket endpoint:
 **Enable Proactivity (Native Audio Only):**
 
 ```python
+# bidi-demo/app/main.py:114-124 (proactivity example)
 run_config = RunConfig(
     streaming_mode=StreamingMode.BIDI,
     response_modalities=["AUDIO"],
@@ -1634,6 +1683,7 @@ With proactivity enabled, the model may:
 **Change the Voice:**
 
 ```python
+# bidi-demo/app/main.py:114-124 (voice configuration example)
 run_config = RunConfig(
     streaming_mode=StreamingMode.BIDI,
     response_modalities=["AUDIO"],
@@ -1736,6 +1786,7 @@ After this workshop, consider exploring:
 **Enable Debug Logging:**
 
 ```python
+# bidi-demo/app/main.py:27-31
 import logging
 logging.basicConfig(level=logging.DEBUG)
 ```
@@ -1774,6 +1825,7 @@ GOOGLE_CLOUD_LOCATION=us-central1
 ### LiveRequestQueue Methods
 
 ```python
+# bidi-demo/app/main.py:169-217, 246-253
 # Text message (turn-based)
 content = types.Content(parts=[types.Part(text="Hello")])
 live_request_queue.send_content(content)
@@ -1793,6 +1845,7 @@ live_request_queue.close()
 ### RunConfig Quick Reference
 
 ```python
+# bidi-demo/app/main.py:114-124
 from google.adk.agents.run_config import RunConfig, StreamingMode
 from google.genai import types
 
@@ -1823,6 +1876,7 @@ run_config = RunConfig(
 ### Event Processing Pattern
 
 ```python
+# bidi-demo/app/main.py:225-233
 async for event in runner.run_live(...):
     # Text/Audio content
     if event.content and event.content.parts:
