@@ -8,13 +8,13 @@
 
 ## Workshop Overview
 
-This hands-on workshop teaches you how to build real-time, bidirectional streaming AI applications using Google's Agent Development Kit (ADK). You will deploy and explore the bidi-demo application on Cloud Shell Editor, learning the core concepts of ADK Bidi-streaming through practical experimentation.
+This hands-on workshop teaches you how to build real-time, bidirectional streaming AI applications using Google's [Agent Development Kit (ADK)](https://google.github.io/adk-docs/). You will deploy and explore the bidi-demo application on [Cloud Shell Editor](https://cloud.google.com/shell/docs/editor-overview), learning the core concepts of ADK Bidi-streaming through practical experimentation.
 
 ![ADK Bidi-streaming Demo](../docs/assets/bidi-demo-screen.png)
 
 ### What is ADK Bidi-streaming?
 
-ADK Bidi-streaming enables real-time, two-way communication between your application and Gemini models through the Live API. Unlike traditional request-response patterns, bidirectional streaming allows:
+ADK Bidi-streaming enables real-time, two-way communication between your application and [Gemini](https://deepmind.google/technologies/gemini/) models through the [Live API](https://ai.google.dev/gemini-api/docs/live). Unlike traditional request-response patterns, bidirectional streaming allows:
 
 - **Continuous input streaming**: Send audio, text, and images in real-time without waiting for responses
 - **Concurrent output streaming**: Receive model responses, transcriptions, and events while still sending input
@@ -48,9 +48,9 @@ The diagram above shows a key feature of Bidi-streaming: **interruption**. The u
 ### Prerequisites
 
 - Google Cloud account with billing enabled
-- Google AI Studio API key (GOOGLE_API_KEY)
+- [Google AI Studio](https://aistudio.google.com) API key (GOOGLE_API_KEY)
 - Basic Python knowledge
-- Familiarity with async/await concepts
+- Familiarity with [async/await](https://docs.python.org/3/library/asyncio.html) concepts
 - Web browser with microphone access (Chrome recommended)
 
 ### Learning Objectives
@@ -139,9 +139,9 @@ pip install -e .
 
 This installs the bidi-demo package and all required dependencies including:
 - `google-adk` - Agent Development Kit
-- `fastapi` - Web framework
-- `uvicorn` - ASGI server
-- `python-dotenv` - Environment variable management
+- [`fastapi`](https://fastapi.tiangolo.com/) - Web framework
+- [`uvicorn`](https://www.uvicorn.org/) - ASGI server
+- [`python-dotenv`](https://pypi.org/project/python-dotenv/) - Environment variable management
 
 ### 1.3 Understanding the Directory Structure
 
@@ -162,7 +162,7 @@ bidi-demo/
 │           ├── app.js                # Main app logic, WebSocket, event handling
 │           ├── audio-recorder.js     # Microphone capture (16kHz)
 │           ├── audio-player.js       # Audio playback (24kHz)
-│           ├── pcm-recorder-processor.js  # AudioWorklet for recording
+│           ├── pcm-recorder-processor.js  # [AudioWorklet](https://developer.mozilla.org/en-US/docs/Web/API/AudioWorklet) for recording
 │           └── pcm-player-processor.js    # AudioWorklet for playback
 ├── pyproject.toml                    # Python package configuration
 └── README.md                         # Project documentation
@@ -175,7 +175,7 @@ bidi-demo/
 | `app/main.py` | Server-side: FastAPI app, WebSocket endpoint, upstream/downstream tasks |
 | `app/google_search_agent/agent.py` | Agent definition: model, tools, instruction |
 | `app/static/js/app.js` | Client-side: WebSocket connection, event handling, UI updates |
-| `app/static/js/audio-*.js` | Client-side: Audio capture and playback with Web Audio API |
+| `app/static/js/audio-*.js` | Client-side: Audio capture and playback with [Web Audio API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Audio_API) |
 
 Take a moment to open these files in the editor. We'll walk through them in detail in Section 4.
 
@@ -228,7 +228,7 @@ Before diving into code, you need a mental model of how the pieces connect. ADK 
 
 ![ADK Bidi-streaming High-Level Architecture](assets/Bidi_arch.jpeg)
 
-**You own the application layer.** This includes the client applications your users interact with (web, mobile, kiosk) and the transport server that manages connections. Most teams use FastAPI with WebSockets, but any framework supporting real-time communication works. You also define your Agent—the instructions, tools, and behaviors that make your AI unique.
+**You own the application layer.** This includes the client applications your users interact with (web, mobile, kiosk) and the transport server that manages connections. Most teams use FastAPI with [WebSockets](https://developer.mozilla.org/en-US/docs/Web/API/WebSockets_API), but any framework supporting real-time communication works. You also define your Agent—the instructions, tools, and behaviors that make your AI unique.
 
 **ADK handles the orchestration.** The framework provides three key components that eliminate infrastructure work:
 
@@ -238,7 +238,7 @@ Before diving into code, you need a mental model of how the pieces connect. ADK 
 | **Runner** | Manages session lifecycles and conversation state |
 | **LLM Flow** | Handles the complex protocol translation you never want to write yourself |
 
-**Google provides the AI backbone.** The Live API—available through Gemini Live API for rapid prototyping or Vertex AI Live API for enterprise production—delivers real-time, low-latency AI processing with built-in support for audio, video, and natural interruptions.
+**Google provides the AI backbone.** The Live API—available through Gemini Live API for rapid prototyping or [Vertex AI Live API](https://cloud.google.com/vertex-ai/generative-ai/docs/live-api) for enterprise production—delivers real-time, low-latency AI processing with built-in support for audio, video, and natural interruptions.
 
 > **Why this matters:** The bidirectional arrows in the diagram aren't just decoration—they represent true concurrent communication. Users can interrupt the AI mid-sentence, just like in human conversation. This is fundamentally different from request-response APIs, and it's what makes voice AI feel natural rather than robotic.
 
@@ -259,7 +259,7 @@ The answer becomes viscerally clear when you compare the two approaches side-by-
 
 With the raw Live API, you're responsible for everything. Tool execution? You detect function calls, invoke your code, format responses, and send them back—manually coordinating with ongoing audio streams. Connection drops? You implement reconnection logic, cache session handles, and restore state. Session persistence? You design the schema, handle serialization, and manage the storage layer.
 
-**ADK transforms all of this into declarative configuration.** Tools execute automatically in parallel. Connections resume transparently when WebSocket timeouts occur. Sessions persist to your choice of database with zero custom code. Events arrive as typed Pydantic models you can serialize with a single method call.
+**ADK transforms all of this into declarative configuration.** Tools execute automatically in parallel. Connections resume transparently when WebSocket timeouts occur. Sessions persist to your choice of database with zero custom code. Events arrive as typed [Pydantic](https://docs.pydantic.dev/) models you can serialize with a single method call.
 
 | Capability | Raw Live API | ADK Bidi-streaming |
 |------------|--------------|-------------------|
@@ -395,7 +395,7 @@ The path from your application to the AI flows through a single interface: LiveR
 
 **Sending text** is straightforward. When a user types a message, you wrap it in a Content object and call `send_content()`. This signals a complete turn to the model, triggering immediate response generation.
 
-**Streaming audio** works differently. You call `send_realtime()` with small chunks (50-100ms recommended) continuously as the user speaks. The model processes audio in real-time, using Voice Activity Detection to determine when the user has finished.
+**Streaming audio** works differently. You call `send_realtime()` with small chunks (50-100ms recommended) continuously as the user speaks. The model processes audio in real-time, using [Voice Activity Detection (VAD)](https://ai.google.dev/gemini-api/docs/live#voice-activity-detection-vad) to determine when the user has finished.
 
 **Manual turn control** is available when you need it. If you're building a push-to-talk interface or using client-side VAD, `send_activity_start()` and `send_activity_end()` explicitly signal speech boundaries.
 
@@ -638,7 +638,7 @@ ADK Bidi-streaming isn't limited to text—it's a full multimodal platform suppo
 
 | Direction | Format | Sample Rate | Channels | Chunk Size |
 |-----------|--------|-------------|----------|------------|
-| **Input** (your voice) | 16-bit PCM | 16 kHz | Mono | 50-100ms (1,600-3,200 bytes) |
+| **Input** (your voice) | 16-bit [PCM](https://en.wikipedia.org/wiki/Pulse-code_modulation) | 16 kHz | Mono | 50-100ms (1,600-3,200 bytes) |
 | **Output** (model voice) | 16-bit PCM | 24 kHz | Mono | Use ring buffer for smooth playback |
 
 The browser's AudioWorklet captures microphone input, converts Float32 samples to Int16, and streams via WebSocket. For playback, use a ring buffer in your AudioWorklet player to absorb network jitter.
@@ -1641,7 +1641,7 @@ def get_current_time(timezone: str = "UTC") -> str:
         The current time as a formatted string
     """
     from datetime import datetime
-    import pytz
+    import pytz  # https://pypi.org/project/pytz/
 
     try:
         tz = pytz.timezone(timezone)
@@ -1700,7 +1700,7 @@ run_config = RunConfig(
 **Available Voices (Half-Cascade):**
 - Puck, Charon, Kore, Fenrir, Aoede, Leda, Orus, Zephyr
 
-**Native Audio Models:** Support extended voice library from Text-to-Speech service.
+**Native Audio Models:** Support extended voice library from [Text-to-Speech](https://cloud.google.com/text-to-speech) service.
 
 ### 5.4 Quick Experiments Checklist
 
@@ -1762,7 +1762,7 @@ After this workshop, consider exploring:
 
 1. **Multi-Agent Systems**: Create agents with different voices that hand off conversations
 2. **Custom Streaming Tools**: Build tools that yield video frames continuously
-3. **Production Deployment**: Use Cloud Run with DatabaseSessionService for scalability
+3. **Production Deployment**: Use [Cloud Run](https://cloud.google.com/run) with DatabaseSessionService for scalability
 4. **Client-Side VAD**: Implement browser-based voice detection to reduce bandwidth
 5. **Session Resumption**: Handle disconnections gracefully with session state persistence
 
