@@ -489,7 +489,7 @@ Take a short break. When you return, we'll dive into the code!
 
 ### 4.1 Application Initialization
 
-Open `app/main.py` in the editor and examine the application initialization:
+Open `app/main.py` in the editor and examine the application initialization. This phase runs once when the server starts and creates the shared components that all WebSocket connections will use.
 
 ```python
 # bidi-demo/app/main.py:19-53
@@ -516,15 +516,32 @@ session_service = InMemorySessionService()  # Stores conversation history
 runner = Runner(app_name=APP_NAME, agent=agent, session_service=session_service)
 ```
 
-**Key Points:**
+**Understanding each component:**
 
-1. **Environment variables first**: `load_dotenv()` must run before importing the agent, because the agent reads `DEMO_AGENT_MODEL` at import time
-2. **Single instances**: SessionService and Runner are created once and shared across all connections
-3. **InMemorySessionService**: Stores sessions in memory (use DatabaseSessionService for production)
+- **`load_dotenv()`**: Loads environment variables from the `.env` file into the process. This must happen before importing the agent because the agent definition reads `DEMO_AGENT_MODEL` at module load time to configure which Gemini model to use.
+
+- **`agent`**: The Agent object defines your AI's personality and capabilities. It's imported from a separate module where you configure the model, system instruction, and available tools. The agent is stateless—the same agent instance can serve all users.
+
+- **`FastAPI()`**: Creates the web application that handles HTTP requests and WebSocket connections. FastAPI is chosen for its native async support, which is essential for real-time streaming.
+
+- **`StaticFiles`**: Serves the frontend assets (HTML, CSS, JavaScript) that make up the web UI. This allows the server to host both the API and the client application.
+
+- **`InMemorySessionService`**: Manages session state and conversation history. Sessions are stored in memory, which is fast but loses data when the server restarts. For production, consider `DatabaseSessionService` for persistent storage.
+
+- **`Runner`**: The orchestrator that manages the streaming lifecycle. It coordinates between your agent, the session service, and the Live API. The runner is thread-safe and can handle multiple concurrent connections.
+
+**Why single instances matter:**
+
+Creating `SessionService` and `Runner` once at startup (rather than per-connection) provides several benefits:
+
+1. **Memory efficiency**: Shared instances use less memory than per-connection instances
+2. **Session persistence**: All connections access the same session store, enabling reconnection
+3. **Thread safety**: Both classes are designed to handle concurrent access safely
+4. **Resource pooling**: The runner can efficiently manage connections to the Live API
 
 ### 4.2 Session Initialization
 
-Examine the WebSocket endpoint where sessions are initialized:
+Examine the WebSocket endpoint where sessions are initialized. This phase runs for each new WebSocket connection and sets up the per-session resources needed for bidirectional streaming.
 
 ```python
 # bidi-demo/app/main.py:71-163
@@ -580,16 +597,46 @@ async def websocket_endpoint(
     live_request_queue = LiveRequestQueue()
 ```
 
-**Key Points:**
+**Understanding the WebSocket endpoint:**
 
-1. **Model detection**: The code auto-detects native audio vs half-cascade models
-2. **RunConfig per session**: Each connection gets its own configuration
-3. **Session management**: Supports both new sessions and reconnections
-4. **LiveRequestQueue per session**: Each connection needs its own queue
+- **Path parameters (`user_id`, `session_id`)**: Extracted from the URL path (e.g., `/ws/user123/session456`). These identifiers enable session persistence—if a user reconnects with the same IDs, they resume their existing conversation.
+
+- **Query parameters (`proactivity`, `affective_dialog`)**: Optional boolean flags passed as URL query strings (e.g., `?proactivity=true`). These enable advanced features only available on native audio models.
+
+- **`websocket.accept()`**: Completes the WebSocket handshake. The connection upgrades from HTTP to WebSocket protocol, enabling full-duplex communication.
+
+**Understanding RunConfig:**
+
+The `RunConfig` object controls how the streaming session behaves. Different model architectures require different configurations:
+
+| Setting | Native Audio | Half-Cascade |
+|---------|--------------|--------------|
+| `response_modalities` | `["AUDIO"]` (required) | `["TEXT"]` (faster) |
+| `input_audio_transcription` | Enabled | Not needed |
+| `output_audio_transcription` | Enabled | Not needed |
+| `proactivity` | Optional | Not supported |
+| `affective_dialog` | Optional | Not supported |
+
+**Understanding session management:**
+
+- **`get_session()`**: Attempts to retrieve an existing session. Returns `None` if no session exists for this user/session ID combination.
+
+- **`create_session()`**: Creates a new session if none exists. The session stores conversation history, enabling context continuity.
+
+- **Session keys**: The combination of `app_name`, `user_id`, and `session_id` uniquely identifies a session. This allows multiple sessions per user and multiple users per application.
+
+**Understanding LiveRequestQueue:**
+
+A new `LiveRequestQueue` is created for each connection. This queue is the communication channel between your upstream task and the Live API. Key characteristics:
+
+1. **Per-connection**: Each WebSocket connection gets its own queue (unlike SessionService, which is shared)
+2. **Thread-safe**: Can receive messages from async tasks concurrently
+3. **Buffered**: Handles timing differences between client and server
+4. **Must be closed**: Always close the queue when the connection ends to release resources
 
 ### 4.3 Upstream Task
 
-The upstream task handles all incoming messages from the client:
+The upstream task handles all incoming messages from the client, running as a continuous loop that bridges the WebSocket connection to the LiveRequestQueue. This task is one half of the concurrent pair that enables bidirectional streaming.
 
 ```python
 # bidi-demo/app/main.py:169-217
@@ -628,15 +675,40 @@ async def upstream_task() -> None:
                 live_request_queue.send_realtime(image_blob)  # Send for analysis
 ```
 
-This task bridges the WebSocket connection to the LiveRequestQueue, converting browser data formats to ADK types.
+**Understanding the upstream loop:**
 
-**Key Points:**
+- **`while True` loop**: The task runs indefinitely until the WebSocket disconnects (which raises an exception caught by the outer `try/except`). This design keeps the task alive to receive messages at any time.
 
-1. **Binary vs Text frames**: Audio uses efficient binary WebSocket frames; text/images use JSON
-2. **send_content() vs send_realtime()**:
-   - `send_content()`: For discrete text messages (triggers a turn)
-   - `send_realtime()`: For streaming data (audio, images) that flows continuously
-3. **MIME types matter**: `audio/pcm;rate=16000` tells the API the audio format
+- **`await websocket.receive()`**: This is an async operation that yields control to other tasks while waiting for the next WebSocket frame. When a frame arrives, it returns a dictionary containing either `"bytes"` (for binary frames) or `"text"` (for text frames).
+
+- **Frame type detection**: WebSocket supports two payload types—binary and text. The code checks which key exists in the message dictionary to determine the frame type.
+
+**Understanding ADK types:**
+
+- **`types.Blob`**: Represents binary data with a MIME type. Used for audio, images, and video. The MIME type (e.g., `audio/pcm;rate=16000`) tells the Live API how to interpret the bytes.
+
+- **`types.Content`**: Represents structured content with one or more parts. Used for text messages. The `parts` list can contain multiple `Part` objects for multipart content.
+
+- **`types.Part`**: A single piece of content, which can be text (`text=...`), binary data (`inline_data=...`), or a file reference (`file_data=...`).
+
+**Understanding send methods:**
+
+| Method | Data Type | Behavior | Use Case |
+|--------|-----------|----------|----------|
+| `send_content()` | `types.Content` | Signals end of turn, triggers response | User sends a text message |
+| `send_realtime()` | `types.Blob` | Continuous streaming, no turn signal | Audio chunks, video frames, images |
+
+The key difference: `send_content()` tells the model "the user is done speaking, please respond," while `send_realtime()` says "here's more data, keep listening."
+
+**Why MIME types matter:**
+
+The MIME type string contains critical information for the Live API:
+
+- `audio/pcm;rate=16000`: Raw PCM audio at 16kHz sample rate (required format for input)
+- `image/jpeg`: JPEG-compressed image
+- `image/png`: PNG image with transparency support
+
+Incorrect MIME types will cause the Live API to misinterpret the data, leading to errors or garbled output.
 
 #### Understanding LiveRequestQueue
 
@@ -655,9 +727,11 @@ The path from your application to the AI flows through a single interface: LiveR
 
 #### Client-Side: Sending Text Messages
 
-The client sends text messages as JSON through the WebSocket:
+The client sends text messages as JSON through the WebSocket. Unlike audio which streams continuously as binary data, text messages are discrete events sent when the user explicitly submits a message.
 
 **JavaScript (app.js):**
+
+The `sendMessage()` function packages text into a JSON object and sends it as a WebSocket text frame. The server parses this JSON to extract the message content.
 
 ```javascript
 // bidi-demo/app/static/js/app.js:755-766
@@ -674,7 +748,19 @@ function sendMessage(message) {
 }
 ```
 
-The `type` field tells the server how to process the message—"text" for typed messages, "image" for captured frames.
+**Understanding the message structure:**
+
+- **`type: "text"`**: This field acts as a discriminator that tells the server how to process the message. The server's `upstream_task()` uses this to determine whether to call `send_content()` (for text) or `send_realtime()` (for images).
+
+- **`text`**: The actual message content typed by the user.
+
+- **`JSON.stringify()`**: Converts the JavaScript object to a JSON string for transmission over WebSocket.
+
+- **`websocket.send()`**: When passed a string, WebSocket sends it as a text frame (not binary).
+
+**Form submission handler:**
+
+The form submission handler demonstrates the "optimistic update" pattern, where the UI updates immediately before the server confirms receipt:
 
 ```javascript
 // bidi-demo/app/static/js/app.js:734-752
@@ -692,13 +778,29 @@ messageForm.onsubmit = function(e) {
 };
 ```
 
-The UI updates immediately when the user sends a message, providing instant feedback while the server processes the request.
+**Understanding the optimistic update pattern:**
+
+1. **`e.preventDefault()`**: Prevents the default form submission behavior (page reload). This is essential for single-page applications.
+
+2. **`message.trim()`**: Removes leading/trailing whitespace. Empty messages are ignored.
+
+3. **Immediate UI update**: The `createMessageBubble()` creates a chat bubble and appends it to the chat area before sending to the server. This provides instant visual feedback to the user.
+
+4. **Clear input**: The input field is cleared immediately so the user can start typing their next message.
+
+5. **Async send**: `sendMessage()` sends the message to the server. The response will arrive later via the `websocket.onmessage` handler.
+
+**Why optimistic updates matter:**
+
+In real-time applications, waiting for server confirmation before showing the user's message creates a perceptible delay that feels sluggish. By showing the message immediately, the UI feels responsive even if the server takes time to process the request. If the send fails, you can handle it by showing an error indicator on the message bubble.
 
 #### Client-Side: Sending Audio
 
-Audio capture uses Web Audio API with AudioWorklet for real-time processing:
+Audio capture uses Web Audio API with AudioWorklet for real-time processing. The AudioWorklet API provides low-latency audio processing by running on a dedicated audio rendering thread, separate from the main JavaScript thread. This architecture is essential for real-time audio applications because it prevents audio glitches that would occur if the main thread was blocked by other JavaScript execution.
 
 **JavaScript (audio-recorder.js):**
+
+The `startAudioRecorderWorklet()` function sets up the complete audio capture pipeline. It creates an AudioContext configured for 16kHz sample rate (matching the Live API's required input format), loads an AudioWorklet processor module, obtains microphone access, and connects all the audio nodes together.
 
 ```javascript
 // bidi-demo/app/static/js/audio-recorder.js:7-38
@@ -735,7 +837,21 @@ export async function startAudioRecorderWorklet(audioRecorderHandler) {
 }
 ```
 
-The AudioWorklet runs on a separate audio thread, ensuring smooth capture without blocking the main UI thread.
+**Key steps in the audio pipeline:**
+
+1. **AudioContext creation**: The `sampleRate: 16000` configuration tells the browser to resample microphone audio to 16kHz, which is the exact format the Live API expects for input audio.
+
+2. **AudioWorklet module loading**: The `addModule()` method loads the processor script (`pcm-recorder-processor.js`) into the audio worklet global scope. This must complete before creating AudioWorkletNode instances.
+
+3. **Microphone access**: `getUserMedia()` requests permission and returns a MediaStream. The `channelCount: 1` constraint ensures mono audio, reducing bandwidth by half compared to stereo.
+
+4. **Audio node graph**: The `source.connect(audioRecorderNode)` call creates the processing pipeline: microphone → MediaStreamSource → AudioWorkletNode. Audio flows through this graph automatically.
+
+5. **Message port communication**: AudioWorklets run on a separate thread and communicate with the main thread via `postMessage()`. The `onmessage` handler receives audio chunks and converts them to PCM format.
+
+**Audio format conversion:**
+
+The Web Audio API internally uses 32-bit floating-point samples normalized to the range [-1.0, 1.0]. However, the Live API requires 16-bit signed PCM integers in the range [-32768, 32767]. The `convertFloat32ToPCM()` function performs this essential format conversion.
 
 ```javascript
 // bidi-demo/app/static/js/audio-recorder.js:49-58
@@ -750,9 +866,19 @@ function convertFloat32ToPCM(inputData) {
 }
 ```
 
-Web Audio provides Float32 samples (-1 to 1), but the Live API requires 16-bit PCM integers. This conversion is essential.
+**Understanding the conversion:**
+
+- **Float32 range**: Web Audio samples are floating-point values between -1.0 (maximum negative amplitude) and 1.0 (maximum positive amplitude), with 0.0 being silence.
+
+- **Int16 range**: PCM audio uses 16-bit signed integers ranging from -32768 (`-0x8000`) to 32767 (`0x7fff`).
+
+- **Scaling factor**: Multiplying by `0x7fff` (32767) maps the float range to the integer range. For example, a float value of 0.5 becomes approximately 16383.
+
+- **ArrayBuffer return**: The function returns `pcm16.buffer` (the underlying ArrayBuffer) rather than the Int16Array, making it suitable for WebSocket binary transmission.
 
 **JavaScript (pcm-recorder-processor.js):**
+
+The AudioWorklet processor runs on the audio rendering thread, completely isolated from the main JavaScript thread. This file defines a custom processor class that captures audio samples and sends them to the main thread for further processing. AudioWorklet processors must extend `AudioWorkletProcessor` and implement the `process()` method.
 
 ```javascript
 // bidi-demo/app/static/js/pcm-recorder-processor.js:1-18
@@ -773,7 +899,23 @@ class PCMProcessor extends AudioWorkletProcessor {
 registerProcessor("pcm-recorder-processor", PCMProcessor);
 ```
 
+**How the AudioWorklet processor works:**
+
+- **`process()` method**: Called automatically by the audio system for each render quantum (typically 128 samples at a time). This happens approximately 125 times per second at 16kHz sample rate.
+
+- **Input structure**: The `inputs` parameter is a 3D array: `inputs[inputIndex][channelIndex][sampleIndex]`. For mono microphone input, we access `inputs[0][0]` to get the first channel of the first input.
+
+- **Data copying**: We create a copy of the input data (`new Float32Array(inputChannel)`) because the original buffer is reused by the audio system and would be overwritten before the main thread processes it.
+
+- **MessagePort communication**: `this.port.postMessage()` sends the audio data to the main thread via a MessageChannel. This is the only way to communicate between the audio thread and main thread.
+
+- **Return value**: Returning `true` keeps the processor alive. Returning `false` would disconnect the node and stop processing.
+
+- **`registerProcessor()`**: This global function registers the processor class with a name that can be referenced when creating `AudioWorkletNode` instances in the main thread.
+
 **JavaScript (app.js) - Sending audio chunks:**
+
+The `audioRecorderHandler()` function is the callback that receives converted PCM audio data and sends it to the server. This function is called approximately 125 times per second (once per render quantum) while audio recording is active.
 
 ```javascript
 // bidi-demo/app/static/js/app.js:979-988
@@ -786,11 +928,32 @@ function audioRecorderHandler(pcmData) {
 }
 ```
 
+**Key aspects of audio transmission:**
+
+- **Connection check**: The function verifies the WebSocket is connected (`readyState === WebSocket.OPEN`) before attempting to send. This prevents errors if the connection was closed while audio was still being captured.
+
+- **Audio mode check**: The `is_audio` flag ensures audio is only sent when the user has enabled audio input mode, preventing accidental audio transmission.
+
+- **Binary WebSocket frames**: The `websocket.send(pcmData)` call sends the ArrayBuffer as a binary frame, not a text frame. Binary transmission is more efficient than base64-encoding the audio data, reducing bandwidth by approximately 33%.
+
+- **No buffering**: Audio chunks are sent immediately as they are captured, providing the lowest possible latency. The Live API handles reassembly and processing on the server side.
+
+**Complete audio data flow:**
+
+```
+Microphone → MediaStream → AudioContext (16kHz) → AudioWorkletNode
+    → PCMProcessor (audio thread) → postMessage → Main thread
+    → convertFloat32ToPCM → audioRecorderHandler → WebSocket (binary)
+    → Server → LiveRequestQueue.send_realtime() → Live API
+```
+
 #### Client-Side: Sending Images
 
-Images are captured from the camera, converted to JPEG, and sent as base64:
+Images are captured from the camera, converted to JPEG, and sent as base64-encoded JSON messages. Unlike audio which streams continuously as binary data, images are sent as discrete snapshots when the user explicitly captures a frame. The Live API can process these images alongside audio and text for multimodal understanding.
 
 **JavaScript (app.js):**
+
+The `openCameraPreview()` function initializes camera access and displays a live preview to the user. This allows users to see what the camera sees before capturing an image.
 
 ```javascript
 // bidi-demo/app/static/js/app.js:803-830
@@ -807,6 +970,20 @@ async function openCameraPreview() {
     cameraModal.classList.add('show');
 }
 ```
+
+**Understanding camera access:**
+
+- **`getUserMedia()` API**: This is the standard Web API for accessing media devices. Unlike audio capture which requires AudioWorklet for processing, video can be displayed directly in an HTML `<video>` element.
+
+- **Video constraints**: The `width` and `height` are set to `ideal: 768` pixels. The browser will try to match these dimensions but may adjust based on camera capabilities. A square aspect ratio works well for the Live API.
+
+- **`facingMode: 'user'`**: This constraint requests the front-facing camera on mobile devices. On desktops, it typically selects the default webcam.
+
+- **MediaStream handling**: The returned `cameraStream` is a MediaStream object that can be assigned to a `<video>` element's `srcObject` property for live preview.
+
+**Image capture and encoding:**
+
+The `captureImageFromPreview()` function captures a single frame from the live video preview, converts it to JPEG format, and encodes it as base64 for transmission. This multi-step process uses the HTML Canvas API as an intermediary for image processing.
 
 ```javascript
 // bidi-demo/app/static/js/app.js:848-903
@@ -836,6 +1013,30 @@ function captureImageFromPreview() {
 }
 ```
 
+**Step-by-step image capture process:**
+
+1. **Canvas creation**: A temporary canvas element is created with dimensions matching the video's actual resolution (`videoWidth` and `videoHeight`). This ensures the captured image matches the source quality.
+
+2. **Frame drawing**: `context.drawImage()` copies the current video frame onto the canvas. This effectively takes a "screenshot" of the video at that exact moment.
+
+3. **JPEG conversion**: `canvas.toBlob()` converts the canvas content to a Blob in JPEG format. The third parameter (`0.85`) sets the quality level (85%), balancing image quality against file size.
+
+4. **Base64 encoding**: A FileReader converts the Blob to a data URL, which includes the base64-encoded image data. The `split(',')[1]` removes the `data:image/jpeg;base64,` prefix, leaving only the raw base64 data.
+
+5. **Asynchronous flow**: The `toBlob()` and `readAsDataURL()` operations are asynchronous, using callbacks to handle the results. The image is sent only after encoding completes.
+
+**Why base64 instead of binary?**
+
+Unlike audio which uses binary WebSocket frames, images are sent as base64-encoded JSON for several reasons:
+
+- Images are sent infrequently (on user action), so the 33% size overhead of base64 is acceptable
+- JSON messages can include metadata like `mimeType` alongside the data
+- The server-side handler can easily distinguish image messages from text messages by checking the `type` field
+
+**Sending the image to the server:**
+
+The `sendImage()` function packages the base64-encoded image data into a JSON message and sends it over the WebSocket connection. The server-side handler parses this JSON and forwards the image to the Live API.
+
 ```javascript
 // bidi-demo/app/static/js/app.js:906-916
 // Send image to server as JSON
@@ -851,9 +1052,39 @@ function sendImage(base64Image) {
 }
 ```
 
+**Understanding the JSON message structure:**
+
+- **`type: "image"`**: This field allows the server to identify the message type. The server-side `upstream_task()` checks this field to determine how to process incoming messages (text vs. image).
+
+- **`data`**: Contains the raw base64-encoded image data without any prefix. This is decoded on the server using Python's `base64.b64decode()`.
+
+- **`mimeType: "image/jpeg"`**: Specifies the image format so the server can set the correct MIME type when creating the `types.Blob` for the Live API. This could also be `"image/png"` or other supported formats.
+
+**Server-side image handling:**
+
+When the server receives this JSON message, it processes it in the `upstream_task()`:
+
+```python
+# Server extracts and sends image to Live API
+image_data = base64.b64decode(json_message["data"])
+mime_type = json_message.get("mimeType", "image/jpeg")
+image_blob = types.Blob(mime_type=mime_type, data=image_data)
+live_request_queue.send_realtime(image_blob)
+```
+
+**Complete image data flow:**
+
+```
+Camera → MediaStream → <video> element (preview)
+    → Canvas (drawImage) → toBlob (JPEG 85%)
+    → FileReader → base64 encoding → JSON message
+    → WebSocket (text frame) → Server → base64 decode
+    → types.Blob → LiveRequestQueue.send_realtime() → Live API
+```
+
 ### 4.4 Downstream Task
 
-The downstream task processes all events from the model:
+The downstream task processes all events from the model, forming the other half of the concurrent pair that enables bidirectional streaming. While the upstream task sends user input to the model, this task receives model output and forwards it to the client.
 
 ```python
 # bidi-demo/app/main.py:219-234
@@ -871,7 +1102,33 @@ async def downstream_task() -> None:
         await websocket.send_text(event_json)  # Forward to browser
 ```
 
-This task runs concurrently with the upstream task. Events stream continuously as the model generates responses, enabling real-time UI updates.
+**Understanding the downstream loop:**
+
+- **`runner.run_live()`**: This is an async generator that yields events as they arrive from the Live API. It's the primary interface for receiving model output. The generator runs until the session ends or an error occurs.
+
+- **`async for event`**: This loop iterates over events as they're yielded by the generator. Each iteration is non-blocking—while waiting for the next event, Python can execute other tasks (like the upstream task).
+
+- **Shared queue**: The `live_request_queue` parameter connects this task to the upstream task. Both tasks use the same queue—upstream writes to it, and `run_live()` reads from it internally.
+
+- **`run_config`**: The configuration you created during session initialization. It controls response modalities, transcription settings, and advanced features.
+
+**Understanding event serialization:**
+
+- **`event.model_dump_json()`**: ADK events are Pydantic models. This method converts the event to a JSON string, which can be sent over WebSocket.
+
+- **`exclude_none=True`**: Omits fields with `None` values from the JSON output. This reduces message size and makes the JSON cleaner for debugging.
+
+- **`by_alias=True`**: Uses camelCase field names (e.g., `turnComplete` instead of `turn_complete`) to match JavaScript conventions.
+
+**Why this design works:**
+
+The simplicity of this task is intentional. The server acts as a transparent proxy, forwarding events from the Live API to the client without modification. All event processing logic lives in the client-side JavaScript, keeping the server lightweight and scalable.
+
+This design allows you to:
+
+1. Add new event types without modifying server code
+2. Customize event handling per-client
+3. Scale the server horizontally (it's stateless except for the WebSocket connection)
 
 **Event Types You'll Receive:**
 
@@ -1055,9 +1312,11 @@ if (adkEvent.content && adkEvent.content.parts) {
 
 #### Client-Side: Audio Playback
 
-Audio playback uses a ring buffer to handle streaming audio smoothly:
+Audio playback is the inverse of audio capture—it receives PCM audio chunks from the server and plays them through the user's speakers. A ring buffer smooths out network jitter to prevent audio gaps and pops. Like audio capture, playback uses AudioWorklet to run on a dedicated audio thread.
 
 **JavaScript (audio-player.js):**
+
+The `startAudioPlayerWorklet()` function sets up the audio playback pipeline. It creates an AudioContext at 24kHz (matching the Live API's output format) and connects an AudioWorkletNode to the audio destination (speakers).
 
 ```javascript
 // bidi-demo/app/static/js/audio-player.js:5-24
@@ -1078,7 +1337,18 @@ export async function startAudioPlayerWorklet() {
 }
 ```
 
+**Key differences from audio capture:**
+
+| Aspect | Audio Capture | Audio Playback |
+|--------|---------------|----------------|
+| Sample rate | 16kHz (input format) | 24kHz (output format) |
+| Data direction | Microphone → WebSocket | WebSocket → Speakers |
+| Node connection | Source → WorkletNode | WorkletNode → Destination |
+| Data format | Float32 → Int16 | Int16 → Float32 |
+
 **JavaScript (pcm-player-processor.js):**
+
+The `PCMPlayerProcessor` class is the heart of audio playback. It implements a ring buffer that absorbs network timing variations, ensuring smooth audio even when packets arrive at irregular intervals.
 
 ```javascript
 // bidi-demo/app/static/js/pcm-player-processor.js:5-75
@@ -1148,17 +1418,62 @@ class PCMPlayerProcessor extends AudioWorkletProcessor {
 registerProcessor('pcm-player-processor', PCMPlayerProcessor);
 ```
 
-**Key Points:**
+**Understanding the ring buffer:**
 
-1. **Ring buffer**: Absorbs network jitter for smooth playback
-2. **24kHz sample rate**: Matches Live API output format
-3. **Int16 to Float32**: Web Audio API requires Float32 samples
-4. **Mono to stereo**: Duplicate mono to both channels for stereo output
-5. **Interruption handling**: Clear buffer when user interrupts the model
+A ring buffer (circular buffer) is a fixed-size array where data wraps around from the end to the beginning. It's perfect for streaming audio because:
+
+- **No memory allocation**: The buffer is pre-allocated, avoiding garbage collection pauses
+- **Constant-time operations**: Writing and reading are O(1) operations
+- **Automatic overwrite**: When full, old samples are discarded to make room for new ones
+
+```
+Ring buffer visualization (simplified):
+
+     writeIndex
+         ↓
+[ ][█][█][█][█][ ][ ][ ]
+            ↑
+        readIndex
+
+Audio arrives → writes at writeIndex → advances writeIndex
+Audio plays   → reads at readIndex  → advances readIndex
+```
+
+**How the buffer handles timing:**
+
+- **Network arrives faster than playback**: Buffer fills up, providing a cushion against future delays
+- **Network arrives slower than playback**: Buffer drains but doesn't underrun until completely empty
+- **Network jitter**: Variations are absorbed by the buffer, keeping playback smooth
+
+**Understanding interruption handling:**
+
+When the user interrupts the model (starts speaking while the model is responding), the `endOfAudio` command is sent. The processor handles this by setting `readIndex = writeIndex`, which effectively empties the buffer. This causes immediate silence—the model's audio stops playing instantly.
+
+**Format conversion (Int16 to Float32):**
+
+The Live API sends 16-bit signed PCM integers, but Web Audio requires 32-bit floats:
+
+- **Input**: Int16 values from -32768 to 32767
+- **Output**: Float32 values from -1.0 to 1.0
+- **Conversion**: Divide by 32768 (not 32767) for symmetric scaling
+
+**Mono to stereo duplication:**
+
+The Live API sends mono audio (single channel), but most audio outputs expect stereo (left + right channels). The processor writes the same sample to both channels, creating centered mono playback.
+
+**Complete audio playback flow:**
+
+```
+Server → WebSocket (JSON with base64 audio)
+    → Main thread (base64 decode) → postMessage
+    → PCMPlayerProcessor (audio thread)
+    → Ring buffer → Int16 to Float32
+    → process() output → AudioContext destination → Speakers
+```
 
 ### 4.5 Concurrent Execution and Termination
 
-The upstream and downstream tasks run concurrently, enabling true bidirectional communication. Both tasks run simultaneously using `asyncio.gather()`:
+The upstream and downstream tasks run concurrently, enabling true bidirectional communication. This is the architectural pattern that makes real-time conversation possible—both tasks execute simultaneously, allowing the user to send input while receiving model output.
 
 ```python
 # bidi-demo/app/main.py:236-253
@@ -1184,13 +1499,60 @@ finally:
     live_request_queue.close()
 ```
 
-The `finally` block ensures cleanup happens even if an exception occurs. Forgetting to close the queue can lead to resource leaks.
+**Understanding asyncio.gather():**
 
-**Key Points:**
+`asyncio.gather()` is the key to concurrent execution. It takes multiple coroutines and runs them simultaneously within a single thread:
 
-1. **asyncio.gather()**: Runs both tasks concurrently; if one fails, both stop
-2. **Exception handling**: Catch WebSocketDisconnect for clean exits
-3. **finally block**: Always close LiveRequestQueue to terminate the Live API session properly
+```
+                    ┌─────────────────────┐
+                    │  asyncio.gather()   │
+                    └─────────────────────┘
+                              │
+              ┌───────────────┴───────────────┐
+              ▼                               ▼
+    ┌─────────────────┐             ┌─────────────────┐
+    │  upstream_task  │             │ downstream_task │
+    │                 │             │                 │
+    │ await receive() │←──yields───→│ await run_live()│
+    │ send to queue   │             │ await send_text │
+    └─────────────────┘             └─────────────────┘
+```
+
+When one task awaits (e.g., waiting for a WebSocket message), Python's event loop switches to the other task. This cooperative multitasking enables true concurrency without threading complexity.
+
+**Understanding exception propagation:**
+
+- **`WebSocketDisconnect`**: Raised when the client closes the browser tab or loses network connectivity. This is a normal exit condition, not an error.
+
+- **Other exceptions**: Any unhandled exception in either task propagates up. The `gather()` call returns when either task raises an exception, effectively stopping both tasks.
+
+- **Task cancellation**: When one task fails, `gather()` cancels the other task. This ensures both tasks stop together.
+
+**Understanding the finally block:**
+
+The `finally` block executes regardless of how the `try` block exits—whether normally, via exception, or via task cancellation. This guarantees cleanup happens:
+
+- **Why `close()` is critical**: `LiveRequestQueue.close()` sends a termination signal to the Live API, closing the underlying WebSocket connection. Without this, the connection remains open, consuming API quota and server resources.
+
+- **Resource leak prevention**: If you forget to call `close()`, the Live API session persists until it times out (approximately 10 minutes). During this time, you're consuming one of your concurrent session slots.
+
+**Common termination scenarios:**
+
+| Scenario | What Happens | Cleanup |
+|----------|--------------|---------|
+| User closes browser tab | `WebSocketDisconnect` raised | `finally` runs, queue closed |
+| Network disconnection | `WebSocketDisconnect` raised | `finally` runs, queue closed |
+| Server error | Exception logged | `finally` runs, queue closed |
+| Model error | Exception in `run_live()` | `finally` runs, queue closed |
+
+**Why this pattern matters:**
+
+This try/except/finally pattern is the recommended way to manage streaming sessions. It ensures:
+
+1. **Clean exits**: Normal disconnections are handled gracefully without error logs
+2. **Error visibility**: Unexpected errors are logged for debugging
+3. **Resource cleanup**: The Live API connection is always properly closed
+4. **Session persistence**: The session itself (conversation history) is preserved in SessionService for future reconnection
 
 ### 4.6 RunConfig Deep Dive
 
