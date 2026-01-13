@@ -45,6 +45,28 @@ For EACH identified change:
 
 **Critical Rule**: A feature documented in Part 5 counts as "documented" - do NOT report it as missing from Part 1.
 
+### Step 2.5: Validate Source Code References
+
+Run the source reference validator to detect line number drift:
+
+```bash
+python3 .claude/skills/docs-lint/check-source-refs.py \
+  --docs docs/ \
+  --adk-python-repo ../adk-python \
+  --adk-samples-repo ../adk-samples \
+  --new-version v{NEW}
+```
+
+This script:
+- Detects references where code has moved to different line numbers
+- Auto-fixes drifted references (updates line numbers and commit hash)
+- Reports broken references that require manual attention
+
+Include in findings:
+- Number of references auto-fixed (commit changes if any)
+- Broken references requiring manual investigation
+- If fixes were made, note them in the report
+
 ### Step 3: Demo Code Impact
 
 Check if changes affect src/bidi-demo/:
@@ -79,6 +101,11 @@ Post a single comment with this structure:
 ### Cross-Part Coverage
 - All streaming features are documented across parts
 - No conflicts found between parts
+
+### Source Code References
+- Total: X references validated
+- Auto-fixed: Y drifted references
+- Broken: Z references require manual fix
 
 ### Demo Code Status
 - Compatible with v{NEW} / Needs update: [details]

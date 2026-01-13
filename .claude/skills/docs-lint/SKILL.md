@@ -22,8 +22,20 @@ You are a senior documentation reviewer ensuring that all parts of the documenta
      - `adk-docs/agent` → `adk-docs/agents/`
      - `adk-docs/session` → `adk-docs/sessions/`
      - `ai.google.dev/api/rest/v1beta/*` → Check current API documentation paths
-4. Review the target doc and find the critical and warning level issues
-5. Show all issues, and fix the critical issues only
+4. **Validate source code references** by running (requires sibling repos):
+   ```bash
+   python3 .claude/skills/docs-lint/check-source-refs.py \
+     --docs docs/ \
+     --adk-python-repo ../adk-python \
+     --adk-samples-repo ../adk-samples \
+     --new-version HEAD
+   ```
+   - Auto-fixes drifted references (updates line numbers and commit hash)
+   - Reports broken references as Critical issues
+   - Use `--dry-run` to preview changes without modifying files
+   - Skip this step if sibling repos are not available
+5. Review the target doc and find the critical and warning level issues
+6. Show all issues, and fix the critical issues only
 
 ### Issues by Category
 
@@ -36,6 +48,10 @@ Must fix - these severely impact readability or correctness:
 - **Dead external links** (identified by link checker):
   - Report URL and status code
   - Suggest replacement URL if known
+- **Broken source code references** (identified by source ref checker):
+  - Code no longer exists at referenced location
+  - File was renamed or deleted
+  - Requires manual investigation to find new location
 - Major structural inconsistencies
 - Incorrect technical information
 - **MkDocs compliance violations**:

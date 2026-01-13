@@ -94,7 +94,7 @@ This repository provides specialized knowledge through skill configuration files
 - **`gemini-live-api`** (`.claude/skills/gemini-live-api/SKILL.md`): Google Gemini Live API documentation and guides
 - **`vertexai-live-api`** (`.claude/skills/vertexai-live-api/SKILL.md`): Google Cloud Vertex AI Live API documentation
 - **`code-lint`** (`.claude/skills/code-lint/SKILL.md`): Python code linter and formatter using black, isort, and flake8
-- **`docs-lint`** (`.claude/skills/docs-lint/SKILL.md`): Documentation consistency and style reviewer
+- **`docs-lint`** (`.claude/skills/docs-lint/SKILL.md`): Documentation reviewer that checks links, source code references, and style consistency
 - **`mkdocs-lint`** (`.claude/skills/mkdocs-lint/SKILL.md`): MkDocs rendering linter that identifies and fixes critical rendering issues
 
 ### Using Skills
@@ -146,6 +146,7 @@ Before deploying or committing documentation changes, verify documentation quali
    # The skill will:
    # - Check STYLES.md compliance
    # - Run link checker (.claude/skills/docs-lint/check-links.sh)
+   # - Validate source code references (if sibling repos available)
    # - Report critical issues and warnings
    # - Fix critical issues only
    ```
@@ -156,7 +157,19 @@ Before deploying or committing documentation changes, verify documentation quali
    .claude/skills/docs-lint/check-links.sh docs/part*.md
    ```
 
-3. **Run mkdocs-lint skill** to verify MkDocs rendering and fix critical issues:
+3. **Validate source code references** (requires sibling repos):
+
+   ```bash
+   python3 .claude/skills/docs-lint/check-source-refs.py \
+     --docs docs/ \
+     --adk-python-repo ../adk-python \
+     --adk-samples-repo ../adk-samples \
+     --new-version HEAD
+   ```
+
+   This auto-fixes drifted line numbers and reports broken references.
+
+4. **Run mkdocs-lint skill** to verify MkDocs rendering and fix critical issues:
 
    ```bash
    # Use the mkdocs-lint skill to:
