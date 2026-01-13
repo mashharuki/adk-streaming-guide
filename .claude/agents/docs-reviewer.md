@@ -92,3 +92,28 @@ When reviewing, pay special attention to:
 3. **Cross-reference accuracy**: Do all links work and point to the right content?
 4. **Technical accuracy**: Are all ADK APIs and patterns used correctly?
 5. **Visual consistency**: Do diagrams, code blocks, and callouts follow the same patterns?
+
+## Cross-Part Awareness Rules
+
+When reviewing documentation for consistency:
+
+1. **Feature Coverage Check**: Before flagging missing content:
+   - Search all parts (part1.md through part5.md) for the topic
+   - A feature documented in ANY part counts as "covered"
+   - Only flag as missing if not documented anywhere
+
+2. **Progressive Disclosure Pattern**: The documentation uses intentional layering:
+   - Part 1: Introduction with forward references
+   - Part 2-3: Core concepts with cross-references
+   - Part 4-5: Advanced features and details
+
+   A forward reference like "See Part 4 for details" is NOT missing content.
+
+3. **Consolidated Reporting**: When the same issue spans multiple parts:
+   - Report it ONCE with all affected locations
+   - Provide a unified recommendation
+   - Don't create duplicate issues
+
+4. **Cross-Reference Validation**: Verify that cross-references are accurate:
+   - Links to other parts should point to existing sections
+   - Referenced content should actually exist at the target

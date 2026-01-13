@@ -21,21 +21,12 @@ The workflow system consists of two interconnected workflows that automate the p
               │ New version detected
               ▼
 ┌─────────────────────────────────────┐
-│   Create Parent Issue               │
+│   Create Consolidated Review Issue  │
 │   "ADK vX.Y.Z - Compatibility       │
 │    Review"                          │
-└─────────────┬───────────────────────┘
-              │
-              │ Creates 5 sub-issues
-              ▼
-┌─────────────────────────────────────┐
-│   Sub-Issues (one per doc part)    │
-│   - Part 1: Introduction            │
-│   - Part 2: LiveRequestQueue        │
-│   - Part 3: run_live()              │
-│   - Part 4: RunConfig               │
-│   - Part 5: Audio/Video             │
-│   Each includes @claude mention     │
+│   - Includes @claude mention        │
+│   - Contains version diff info      │
+│   - References change-reviewer      │
 └─────────────┬───────────────────────┘
               │
               │ Triggers on issue open
@@ -43,9 +34,11 @@ The workflow system consists of two interconnected workflows that automate the p
 ┌─────────────────────────────────────┐
 │   Claude Code Reviewer              │
 │   - Reads issue body                │
-│   - Executes adk-reviewer agent     │
-│   - Posts findings as comment       │
-│   - May create PR with fixes        │
+│   - Executes change-reviewer agent  │
+│   - Analyzes ADK version diff       │
+│   - Reviews ALL docs with cross-    │
+│     part awareness                  │
+│   - Posts consolidated findings     │
 └─────────────────────────────────────┘
 ```
 
@@ -187,13 +180,17 @@ git push
 1. Fetches the latest `google-adk` version from PyPI
 2. Compares with the version in `current_adk_version.txt`
 3. If a new version is detected:
-   - Creates a parent issue titled "ADK vX.Y.Z - Documentation Compatibility Review"
-   - Creates 7 sub-issues:
-     - 5 sub-issues for individual documentation parts
-     - 1 sub-issue for the demo application
-     - 1 sub-issue for change documentation review (cross-part analysis)
+   - Creates a single consolidated review issue titled "ADK vX.Y.Z - Documentation Compatibility Review"
+   - Issue includes version diff information (previous → new version)
+   - Issue includes @claude mention with change-reviewer instructions
    - Updates `current_adk_version.txt` with the new version
    - Commits the version file to the repository
+
+**Key Design Decisions**:
+- **Single issue, not multiple sub-issues**: Avoids siloed reviews that create false positives
+- **Version diff focus**: Review focuses on what changed between versions, not generic compatibility
+- **Cross-part awareness**: Uses change-reviewer agent that checks ALL docs before reporting issues
+- **No false positives**: A feature documented in any part counts as "covered"
 
 **Manual Trigger**:
 
@@ -207,9 +204,8 @@ gh workflow run adk-version-monitor.yml -f force_check=true
 
 **Outputs**:
 
-
-- Parent issue with checklist of all documentation parts
-- Sub-issues linked to the parent issue
+- Single consolidated review issue with version diff info
+- Link to GitHub compare view for the version range
 - Commit updating the version tracking file
 
 ### Claude Code Reviewer
@@ -226,16 +222,16 @@ gh workflow run adk-version-monitor.yml -f force_check=true
      - This provides the `google-adk` skill with access to actual ADK source code
      - Enables deep analysis of implementation details, not just documentation
      - Ensures reviews catch subtle API behavior changes
-     - Full git history allows checking recent changes and development trends
+     - Full git history allows version diff analysis (`git log v{OLD}..v{NEW}`)
    - Executes Claude Code with the issue instructions
-   - Claude reads the specified documentation file or code
-   - Runs the appropriate agent based on the review type:
-     - `adk-reviewer` for individual documentation parts (Parts 1-5) and demo app
-     - `change-reviewer` for cross-documentation change analysis
-   - The agent uses the `google-adk` skill to access ADK source code from `../adk-python`
-   - Posts findings as a comment on the issue
+   - Uses the **change-reviewer** agent which:
+     - Analyzes ADK changes between the old and new versions
+     - Reviews ALL documentation parts with cross-part awareness
+     - Checks demo application for compatibility
+     - Only reports issues for genuinely missing/incorrect content
+   - Posts consolidated findings as a single comment
    - May create a pull request with suggested fixes
-   - Adds a `reviewed` label to sub-issues when complete
+   - Adds a `reviewed` label when complete
 
 **Repository Structure in GitHub Actions**:
 
@@ -262,87 +258,90 @@ You can manually trigger reviews by commenting on any issue with the `adk-versio
 @claude Please review this documentation part for ADK compatibility
 ```
 
-## Sub-Issue Types
+## Consolidated Review Approach
 
-The workflow creates three types of sub-issues:
+The workflow creates a **single consolidated review issue** that covers all documentation and code. This design avoids the problems of siloed per-part reviews.
 
-### 1. Individual Documentation Part Reviews (Parts 1-5)
+### What the Review Covers
 
-Reviews each documentation part independently for compatibility with the new ADK version.
+The change-reviewer agent analyzes:
 
-**What it checks:**
+1. **Documentation (docs/part1.md through part5.md)**
+   - API changes affecting any part
+   - Code examples that need updates
+   - Deprecated functionality to remove
+   - New features that should be documented
+   - Cross-part consistency
 
-- API changes affecting the specific part
-- Code examples that need updates
-- Deprecated functionality to remove
-- New features relevant to that part
-- Terminology or concept changes
+2. **Demo Application (src/bidi-demo/)**
+   - Code compatibility with new ADK version
+   - Deprecated API usage
+   - Missing error handling for new features
 
+### Cross-Part Awareness
 
-### 2. Demo Application Review
+The key innovation is **cross-part awareness**:
 
-Reviews the demo application code for compatibility and best practices.
+- Before reporting a feature as "missing", the agent searches ALL parts
+- If documented in ANY part, it counts as covered
+- Only reports issues for genuinely missing content
+- Avoids false positives like "Part 1 doesn't document X" when Part 4 covers it
 
-**What it checks:**
+### Version Diff Focus
 
-- Code that needs updates for new ADK version
-- Missing error handling or edge cases
-- Performance or security issues
-- Deprecated API usage
-- Best practice alignment
+Instead of generic compatibility checks, the review focuses on:
 
+- Actual changes between the previous and new ADK version
+- Git diff analysis: `git log v{OLD}..v{NEW}`
+- CHANGELOG entries for the new version
+- Only streaming-related changes are analyzed
 
-### 3. Change Documentation Review
+### Agent Used
 
-Performs a cross-documentation analysis to find gaps and inconsistencies across all parts.
+The **change-reviewer** agent performs this analysis:
+- Compares ADK versions using git history
+- Reviews CHANGELOG.md for documented changes
+- Searches all docs for coverage of each change
+- Produces a consolidated report with:
+  - Changes analyzed (with coverage status)
+  - Critical issues (breaking changes not documented)
+  - Warnings (new features not documented)
+  - Demo code compatibility status
 
-**What it checks:**
+## Issue Structure
 
-- **Missing features**: New ADK features not documented in any part
-- **Outdated information**: Documentation describing old behavior
-- **Cross-part inconsistencies**: Conflicting information between parts
-- **Incomplete coverage**: Features mentioned but not fully explained
-- **Deprecated content**: Documentation for removed or deprecated APIs
+The consolidated review issue created by the version monitor includes:
 
-**How it works:**
-
-- Uses the `google-adk` skill to access ADK source code and release notes
-- Reviews all documentation files (part1-part5)
-- Identifies gaps that individual part reviews might miss
-- Prioritizes findings by severity (Critical, High, Medium, Low)
-- Suggests specific parts or sections that need updates
-
-
-This change review complements individual part reviews by catching cross-cutting concerns and ensuring complete coverage of ADK features.
-
-**Agent used:** The `change-reviewer` agent can be invoked manually to perform this analysis. It analyzes changes between ADK releases by comparing the current documentation against the latest ADK CHANGELOG and source code, then generates a comprehensive report identifying impacts on both documentation and demo code.
-
-## Sub-Issue Structure
-
-Each sub-issue created by the version monitor includes:
-
-**Title**: `ADK vX.Y.Z - Review Part N: [Part Title]`
+**Title**: `ADK vX.Y.Z - Documentation Compatibility Review`
 
 **Body**: Includes:
 
-- File path to review (e.g., `docs/part1_intro.md`)
-- Instructions for Claude to use the `adk-reviewer` agent
-- Link to parent issue
-- Labels: `adk-version-update`, `documentation`, `automated`, `part-N`
+- Version information (previous → new version)
+- Link to PyPI package
+- Link to GitHub compare view for the version range
+- Instructions for Claude to use the `change-reviewer` agent
+- Labels: `adk-version-update`, `documentation`, `automated`
 
 **Example**:
 
 ```markdown
-## Documentation Review Request
+## ADK Version Update: 1.21.0 → 1.22.0
 
-Please review **Part 1: Introduction to ADK Bidi-streaming** for compatibility with ADK v1.5.0.
+A new version of the Google Agent Development Kit has been released.
 
-### File to Review
-- `docs/part1_intro.md`
+### Version Information
+- **Previous Version**: 1.21.0
+- **New Version**: 1.22.0
+- **Compare Changes**: [v1.21.0...v1.22.0](https://github.com/google/adk-python/compare/v1.21.0...v1.22.0)
 
 ### Review Instructions
 
-@claude Please use the `adk-reviewer` agent to perform a change review...
+@claude Please use the **change-reviewer** agent to perform a consolidated review:
+
+1. **Analyze ADK changes** between v1.21.0 and v1.22.0
+2. **Review all documentation** for impacts
+3. **Review demo application** for compatibility
+4. **Post findings** as a comment
 ```
 
 ## Review Process
@@ -351,33 +350,30 @@ Please review **Part 1: Introduction to ADK Bidi-streaming** for compatibility w
 
 1. **Version Detection** (automated, every 12 hours)
    - Monitor workflow detects new ADK version
-   - Parent and sub-issues are created
+   - Single consolidated review issue is created
 
-2. **Issue Creation** (automated)
-   - One parent issue for overall tracking
-   - Five sub-issues for individual parts
+2. **Claude Review** (automated, triggered by issue creation)
+   - Claude reads the issue body with version diff info
+   - Executes the `change-reviewer` agent
+   - Analyzes ADK changes between versions
+   - Reviews all documentation with cross-part awareness
+   - Posts consolidated findings as a comment
 
-3. **Claude Review** (automated, triggered by issue creation)
-   - Claude reads the issue body
-   - Executes the `adk-reviewer` agent
-   - Posts findings as a comment
-
-4. **Manual Review** (manual, by maintainers)
+3. **Manual Review** (manual, by maintainers)
    - Review Claude's findings
    - Make necessary documentation updates
-   - Close sub-issues as they're addressed
-   - Close parent issue when all parts are reviewed
+   - Close issue when all findings are addressed
 
 ### Expected Review Outputs
 
 Claude's review comment will include:
 
-- **API Changes**: Any breaking or non-breaking changes affecting the docs
-- **Code Examples**: Examples that need updates or corrections
-- **New Features**: New ADK features to document
-- **Deprecations**: Deprecated functionality to remove or update
-- **Terminology**: Changes in concepts or naming
-- **Recommendations**: Suggested updates or improvements
+- **Changes Analyzed**: Table of ADK changes with coverage status
+- **Critical Issues**: Breaking changes not documented anywhere
+- **Warnings**: New features not documented anywhere
+- **Suggestions**: Improvements (not missing content)
+- **Cross-Part Coverage**: Confirmation that features are documented
+- **Demo Code Status**: Compatibility assessment
 
 ### Manual Follow-up
 
@@ -387,8 +383,7 @@ After Claude posts its review:
 2. **Update documentation**: Make required changes to the docs
 3. **Test code examples**: Verify all code examples still work
 4. **Update cross-references**: Fix any broken internal links
-5. **Close sub-issues**: Mark as complete when addressed
-6. **Close parent issue**: When all sub-issues are resolved
+5. **Close issue**: Mark as complete when all findings are addressed
 
 ## Monitoring and Maintenance
 
@@ -475,21 +470,24 @@ on:
     - cron: '0 0 * * 1'
 ```
 
-### Add or Remove Documentation Parts
+### Customize Review Scope
 
-Edit the `matrix.part` section in `adk-version-monitor.yml`:
+Edit the issue body template in `adk-version-monitor.yml` to change what Claude reviews:
 
-```yaml
-strategy:
-  matrix:
-    part:
-      - { number: 1, title: "Your Title", file: "your_file.md" }
-      - { number: 2, title: "Another Title", file: "another_file.md" }
+```javascript
+// In the create_parent_issue step
+const body = `## ADK Version Update: ${currentVersion} → ${version}
+...
+2. **Review all documentation** for impacts:
+   - docs/part1.md through docs/part5.md  // Modify this list
+   - Focus ONLY on sections affected by the version changes
+...
+`;
 ```
 
-### Change Review Instructions
+### Customize Agent Instructions
 
-Modify the sub-issue body template in the `create-sub-issues` job to customize what Claude reviews.
+Modify `.claude/agents/change-reviewer.md` to change how Claude performs the review.
 
 ## Testing the Workflow System
 
@@ -501,11 +499,11 @@ To test that the ADK version monitoring and review system is working correctly, 
 
    ```bash
    # Set version to older version to trigger detection
-   echo "1.17.0" > .github/current_adk_version.txt
+   echo "1.21.0" > .github/current_adk_version.txt
 
    # Commit and push the change
    git add .github/current_adk_version.txt
-   git commit -m "test: set ADK version to 1.17.0 to test workflow"
+   git commit -m "test: set ADK version to 1.21.0 to test workflow"
    git push
    ```
 
@@ -521,47 +519,50 @@ To test that the ADK version monitoring and review system is working correctly, 
    # Check workflow status
    gh run list --limit 3
 
-   # Check for newly created issues
-   gh issue list --state open --search "ADK v1.18.0"
+   # Check for newly created issue (should be only 1, not 8)
+   gh issue list --state open --label adk-version-update
    ```
 
 4. **Expected results**:
 
-   - Parent issue: "ADK v1.18.0 - Documentation Compatibility Review"
-   - 7 sub-issues (one for each documentation part, demo app, and change review)
-   - Claude Code Reviewer workflow should automatically start reviewing the issues
+   - Single consolidated issue: "ADK vX.Y.Z - Documentation Compatibility Review"
+   - Issue contains version diff info (1.21.0 → current)
+   - Issue contains @claude mention with change-reviewer instructions
+   - Claude Code Reviewer workflow should automatically start
 
-5. **Monitor the Claude reviews**:
+5. **Monitor the Claude review**:
 
    ```bash
    # Check Claude Code Reviewer workflow runs
    gh run list --workflow="Claude Code Reviewer" --limit 5
 
-   # View issue comments to see Claude's review results
+   # View issue comments to see Claude's consolidated review
    gh issue view <issue-number>
    ```
 
 6. **Clean up after testing**:
 
    ```bash
-   # Reset to current version and close test issues
-   echo "1.18.0" > .github/current_adk_version.txt
+   # Reset to current version and close test issue
+   echo "1.22.0" > .github/current_adk_version.txt
    git add .github/current_adk_version.txt
    git commit -m "test: reset ADK version after workflow testing"
    git push
 
-   # Close test issues
-   gh issue close <issue-numbers> --comment "Closing test issue"
+   # Close test issue
+   gh issue close <issue-number> --comment "Closing test issue"
    ```
 
 ### What to Verify
 
 - ✅ ADK Version Monitor detects version difference
-- ✅ Parent issue is created with proper title and labels
-- ✅ All 7 sub-issues are created with correct content
+- ✅ Single consolidated issue is created (not 8 separate issues)
+- ✅ Issue contains version diff information (old → new)
+- ✅ Issue contains @claude mention and change-reviewer instructions
 - ✅ Claude Code Reviewer workflow triggers on issue creation
-- ✅ Claude posts review comments on sub-issues
-- ✅ Issues have proper labels and cross-references
+- ✅ Claude posts consolidated review as a single comment
+- ✅ Review focuses on version changes, not generic compatibility
+- ✅ No false positives for features documented in other parts
 
 
 ### Troubleshooting Test Issues

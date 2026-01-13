@@ -21,6 +21,7 @@ jobs:
     outputs:
       new_version_available: ${{ steps.check_version.outputs.new_version_available }}
       latest_version: ${{ steps.check_version.outputs.latest_version }}
+      previous_version: ${{ steps.check_version.outputs.current_version }}
       parent_issue_number: ${{ steps.create_parent_issue.outputs.issue_number }}
 
     steps:
@@ -60,53 +61,47 @@ jobs:
             echo "No new version available"
           fi
 
-      - name: Create parent issue for compatibility review
+      - name: Create consolidated review issue
         if: steps.check_version.outputs.new_version_available == 'true'
         id: create_parent_issue
         uses: actions/github-script@v7
         with:
           script: |
             const version = '${{ steps.check_version.outputs.latest_version }}';
+            const currentVersion = '${{ steps.check_version.outputs.current_version }}';
             const timestamp = new Date().toISOString();
 
-            const body = `## ADK Version ${version} Released
+            const body = `## ADK Version Update: ${currentVersion} → ${version}
 
-            A new version of the Google Agent Development Kit has been released. This issue tracks the documentation compatibility review process.
+            A new version of the Google Agent Development Kit has been released.
 
             ### Version Information
-            - **ADK Version**: ${version}
+            - **Previous Version**: ${currentVersion}
+            - **New Version**: ${version}
             - **Detection Date**: ${timestamp}
             - **PyPI Package**: [google-adk==${version}](https://pypi.org/project/google-adk/${version}/)
+            - **Compare Changes**: [v${currentVersion}...v${version}](https://github.com/google/adk-python/compare/v${currentVersion}...v${version})
 
-            ### Review Process
+            ### Review Instructions
 
-            This parent issue tracks the overall compatibility review. Sub-issues will be created for each documentation part and the demo application:
+            @claude Please use the **change-reviewer** agent to perform a consolidated review:
 
-            **Documentation:**
-            - [ ] Part 1: Introduction to ADK Bidi-streaming
-            - [ ] Part 2: Unified Message Processing with LiveRequestQueue
-            - [ ] Part 3: Event Handling with run_live()
-            - [ ] Part 4: RunConfig Configuration
-            - [ ] Part 5: Audio and Video Features
-            - [ ] Change Review: All documentation vs ADK release notes
+            1. **Analyze ADK changes** between v${currentVersion} and v${version}:
+               - Run \`git fetch --tags && git log v${currentVersion}..v${version} --oneline\` in ../adk-python
+               - Read CHANGELOG.md entries for v${version}
+               - Focus on changes to: runners.py, live_request_queue.py, run_config.py, agents/
 
-            **Demo Application:**
-            - [ ] Bidi-streaming Demo App (src/bidi-demo)
+            2. **Review all documentation** for impacts:
+               - docs/part1.md through docs/part5.md
+               - Focus ONLY on sections affected by the version changes
+               - Check cross-part consistency (a feature documented in one part counts as covered)
 
-            ### Automated Reviews
+            3. **Review demo application** (src/bidi-demo/) for compatibility
 
-            Each documentation part and the demo application will be reviewed by the **adk-reviewer** agent to identify:
-            - API changes that affect the documentation
-            - Code examples that need updates
-            - New features to document
-            - Deprecated functionality to remove
-
-            ### Next Steps
-
-            1. Sub-issues will be automatically created for each documentation part and the demo application
-            2. Claude Code will review each using the **adk-reviewer** agent
-            3. Review results will be posted as comments on sub-issues
-            4. Manual review and updates will be performed as needed
+            4. **Post findings** as a comment with:
+               - Changes requiring documentation updates
+               - Changes requiring demo code updates
+               - Cross-references showing which parts already cover each change
 
             ---
             *This issue was automatically created by the ADK Version Monitor workflow.*
@@ -120,7 +115,7 @@ jobs:
               labels: ['adk-version-update', 'documentation', 'automated']
             });
 
-            console.log(`Created parent issue #${issue.data.number}`);
+            console.log(`Created review issue #${issue.data.number}`);
             core.setOutput('issue_number', issue.data.number);
             return issue.data.number;
 
@@ -156,146 +151,3 @@ jobs:
             echo "**Parent Issue Created**: #${{ steps.create_parent_issue.outputs.issue_number }}" >> $GITHUB_STEP_SUMMARY
           fi
 
-  create-sub-issues:
-    needs: check-version
-    if: needs.check-version.outputs.new_version_available == 'true'
-    runs-on: ubuntu-latest
-    permissions:
-      issues: write
-      contents: read
-
-    strategy:
-      matrix:
-        part:
-          - { number: 1, title: "Introduction to ADK Bidi-streaming", file: "part1_intro.md", type: "documentation" }
-          - { number: 2, title: "Unified Message Processing with LiveRequestQueue", file: "part2_live_request_queue.md", type: "documentation" }
-          - { number: 3, title: "Event Handling with run_live()", file: "part3_run_live.md", type: "documentation" }
-          - { number: 4, title: "RunConfig Configuration", file: "part4_run_config.md", type: "documentation" }
-          - { number: 5, title: "Audio and Video Features", file: "part5_audio_and_video.md", type: "documentation" }
-          - { number: 6, title: "Bidi-streaming Demo Application", file: "src/bidi-demo", type: "code" }
-          - { number: 7, title: "Change Documentation Review", file: "docs/", type: "change-review" }
-
-    steps:
-      - name: Create sub-issue for ${{ matrix.part.type == 'code' && 'Code' || 'Part' }} ${{ matrix.part.number }}
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ secrets.APP_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
-          script: |
-            const version = '${{ needs.check-version.outputs.latest_version }}';
-            const parentIssue = '${{ needs.check-version.outputs.parent_issue_number }}';
-            const partNumber = ${{ matrix.part.number }};
-            const partTitle = '${{ matrix.part.title }}';
-            const partFile = '${{ matrix.part.file }}';
-            const partType = '${{ matrix.part.type }}';
-
-            const isCode = partType === 'code';
-            const isChange = partType === 'change-review';
-            const reviewType = isCode ? 'Code' : (isChange ? 'Change Documentation' : 'Documentation');
-            const filePath = isCode ? partFile : (isChange ? partFile : `docs/${partFile}`);
-
-            let body;
-            if (isChange) {
-              body = `## Change Documentation Review Request
-
-            Please perform a change review of **all documentation** against ADK v${version} to identify inconsistencies and missing features.
-
-            ### Documentation to Review
-            - **All files in ${filePath}** (part1_intro.md through part5_audio_and_video.md)
-
-            ### Review Instructions
-
-            @claude Please use the **change-reviewer** agent to perform a change cross-documentation review:
-
-            1. **Use Change-Reviewer Agent**:
-               - The change-reviewer agent will automatically access ADK v${version} source code
-               - It will systematically review all documentation parts and demo code
-               - It follows the same successful pattern as individual part reviews
-
-            2. **Change Analysis**:
-               - Read all documentation files in ${filePath}
-               - Examine demo application in src/bidi-demo/ for implementation patterns
-               - Cross-reference all parts for consistency and coverage
-
-            3. **Identify Cross-Documentation Issues**:
-               - **Missing features**: New ADK features not documented anywhere
-               - **Cross-part inconsistencies**: Conflicting information between parts
-               - **Outdated information**: Documentation describing deprecated behavior
-               - **Incomplete coverage**: Features mentioned but not fully explained
-               - **Version mismatches**: Examples not compatible with ADK v${version}
-
-            4. **Generate Structured Report**:
-               - **Critical issues (C1, C2...)**: Breaking changes not documented
-               - **Warnings (W1, W2...)**: New major features missing from docs
-               - **Suggestions (S1, S2...)**: Terminology or style improvements
-
-            5. **Provide Change Findings**:
-               - Executive summary of documentation health
-               - Cross-documentation consistency analysis
-               - Specific recommendations for each identified issue
-
-            ### Related Issues
-            - Parent issue: #${parentIssue}
-
-            ---
-            *This sub-issue was automatically created by the ADK Version Monitor workflow.*
-            *It will be automatically assigned to Claude Code for processing.*
-            `;
-            } else {
-              body = `## ${reviewType} Review Request
-
-            Please review **${isCode ? partTitle : `Part ${partNumber}: ${partTitle}`}** for compatibility with ADK v${version}.
-
-            ### ${isCode ? 'Directory' : 'File'} to Review
-            - **${filePath}**
-
-            ### Review Instructions
-
-            @claude Please use the **adk-reviewer** agent to perform a change review of this ${reviewType.toLowerCase()}:
-
-            1. Read the ${isCode ? 'application code in' : 'file'} **${filePath}**
-            2. Use the **adk-reviewer** agent to analyze the content for ADK v${version} compatibility
-            3. Identify any:
-               - API changes affecting the ${reviewType.toLowerCase()}
-               - Code ${isCode ? 'that needs updates' : 'examples that need updates'}
-               - Deprecated functionality to remove or update
-               - ${isCode ? 'Missing error handling or edge cases' : 'New features to document'}
-               - ${isCode ? 'Performance or security issues' : 'Terminology or concept changes'}
-            4. Post your findings as a comment on this issue
-
-            ### Related Issues
-            - Parent issue: #${parentIssue}
-
-            ---
-            *This sub-issue was automatically created by the ADK Version Monitor workflow.*
-            *It will be automatically assigned to Claude Code for processing.*
-            `;
-            }
-
-            const labels = ['adk-version-update', 'automated', `part-${partNumber}`];
-            if (isChange) {
-              labels.push('change-review');
-              labels.push('documentation');
-            } else if (!isCode) {
-              labels.push('documentation');
-            } else {
-              labels.push('demo-app');
-            }
-
-            const issue = await github.rest.issues.create({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              title: `ADK v${version} - Review ${isCode ? '' : `Part ${partNumber}: `}${partTitle}`,
-              body: body,
-              labels: labels,
-              assignees: []
-            });
-
-            console.log(`Created sub-issue #${issue.data.number} for ${isChange ? 'Change Review' : (isCode ? 'Demo App' : `Part ${partNumber}`)}`);
-
-            // Comment on parent issue with link to sub-issue
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: parentIssue,
-              body: `Sub-issue created for ${isChange ? 'Change Review' : (isCode ? 'Demo App' : `Part ${partNumber}`)}: #${issue.data.number}`
-            });
