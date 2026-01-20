@@ -33,16 +33,33 @@ sequenceDiagram
 
 ### What is ADK Bidi-streaming?
 
-The **Agent Development Kit (ADK)** provides a high-level abstraction over the Gemini Live API, handling the complex plumbing of real-time streaming so you can focus on building your application.
+The **[Agent Development Kit (ADK)](https://google.github.io/adk-docs/)** provides a high-level abstraction over the [Gemini Live API](https://ai.google.dev/gemini-api/docs/live), handling the complex plumbing of real-time streaming so you can focus on building your application.
 
 ![ADK abstracts away the complexity of Live API communication](assets/bidi_plumbing.webp)
 
 ADK Bidi-streaming manages:
 
-- **Connection lifecycle**: Establishing, maintaining, and recovering WebSocket connections
+- **Connection lifecycle**: Establishing, maintaining, and recovering [WebSocket](https://developer.mozilla.org/en-US/docs/Web/API/WebSockets_API) connections
 - **Message routing**: Directing audio, text, and images to the right handlers
 - **Session state**: Persisting conversation history across reconnections
 - **Tool execution**: Automatically calling and resuming from function calls
+
+**Why ADK over raw Live API?**
+
+You could build directly on the Gemini Live API, but ADK handles the complex infrastructure so you can focus on your application:
+
+![Raw Live API vs. ADK Bidi-streaming](assets/live_vs_adk.png)
+
+| Capability | Raw Live API | ADK Bidi-streaming |
+|------------|--------------|-------------------|
+| Agent Framework | Build from scratch | Single/multi-agent with tools, evaluation, security |
+| Tool Execution | Manual handling | Automatic parallel execution |
+| Connection Management | Manual reconnection | Transparent session resumption |
+| Event Model | Custom structures | Unified, typed Event objects |
+| Async Framework | Manual coordination | LiveRequestQueue + run_live() generator |
+| Session Persistence | Manual implementation | Built-in SQL, Vertex AI, or in-memory |
+
+> **The bottom line:** ADK reduces months of infrastructure development to days of application development. You focus on what your agent does, not how streaming works.
 
 ### Real-World Use Cases
 
@@ -56,7 +73,7 @@ ADK Bidi-streaming manages:
 
 - **Financial Services**: A client reviews their portfolio while the agent displays charts and simulates trade impacts. The client can share their screen to discuss specific news articles.
 
-**Shopper's Concierge 2 Demo**: Real-time Agentic RAG demo for e-commerce, built with ADK Bidi-streaming and Vertex AI Vector Search, Embeddings, Feature Store and Ranking API:
+**Shopper's Concierge 2 Demo**: Real-time Agentic RAG demo for e-commerce, built with ADK Bidi-streaming and [Vertex AI](https://cloud.google.com/vertex-ai) Vector Search, Embeddings, Feature Store and Ranking API:
 
 [![Shopper's Concierge 2 Demo](https://img.youtube.com/vi/Hwx94smxT_0/maxresdefault.jpg)](https://www.youtube.com/watch?v=Hwx94smxT_0)
 
@@ -72,23 +89,6 @@ For a comprehensive deep-dive, see the [ADK Bidi-streaming Developer Guide](http
 | [Part 4](https://google.github.io/adk-docs/streaming/dev-guide/part4/) | Configuration | Session management, quotas, production controls |
 | [Part 5](https://google.github.io/adk-docs/streaming/dev-guide/part5/) | Multimodal | Audio specs, model architectures, advanced features |
 
-### Model Architectures
-
-Two fundamentally different architectures power voice AI in the Live API:
-
-**Native Audio models** process audio end-to-end without text intermediates. They produce more natural prosody, support an extended voice library, and enable advanced features like affective dialog (emotional adaptation) and proactivity (model-initiated responses). The current model is `gemini-live-2.5-flash-native-audio`.
-
-**Half-Cascade models** convert audio to text, process it, then synthesize speech. They support both TEXT and AUDIO response modalities, offering faster text responses and more predictable tool execution. The model `gemini-2.0-flash-live-001` was deprecated in December 2025.
-
-| Feature | Native Audio | Half-Cascade |
-|---------|--------------|--------------|
-| Response modalities | AUDIO only | TEXT or AUDIO |
-| Speech quality | More natural prosody | Standard TTS |
-| Advanced features | Affective dialog, proactivity | Limited |
-| Tool execution | Works but less predictable | More reliable |
-
-> **Choosing the right model:** For natural conversation with emotional awareness, use native audio. For applications prioritizing tool execution reliability or needing text output, test thoroughly with native audio before committing.
-
 ---
 
 ## Workshop Overview
@@ -102,7 +102,7 @@ In this hands-on workshop, you'll build a complete bidirectional streaming AI ap
 - Handle interruptions naturally
 - Use tools like Google Search
 
-Unlike reading documentation, you'll **write every line of code yourself**, understanding each component as you build it.
+Unlike reading documentation, you'll **examine each component step by step**, understanding how the pieces fit together as you build incrementally.
 
 ![ADK Bidi-streaming Demo](../docs/assets/bidi-demo-screen.png)
 
@@ -111,25 +111,23 @@ Unlike reading documentation, you'll **write every line of code yourself**, unde
 We follow an incremental build approach:
 
 ```
-Step 1: Minimal WebSocket server → "Hello World" response
-Step 2: Add the Agent            → AI-powered responses
+Step 1: Minimal WebSocket Server  → "Hello World" response
+Step 2: Add the Agent             → Define AI behavior and tools
 Step 3: Application Initialization → Runner and session service
-Step 4: Session Initialization   → RunConfig and LiveRequestQueue
-Step 5: Upstream Task            → Client to queue communication
-Step 6: Downstream Task          → Events to client streaming
-Step 7: Add Audio                → Voice input and output
-Step 8: Add Image Input          → Multimodal AI
-Step 9: Production Polish        → Error handling & cleanup
+Step 4: Session Initialization    → RunConfig and LiveRequestQueue
+Step 5: Upstream Task             → Client to queue communication
+Step 6: Downstream Task           → Events to client streaming
+Step 7: Add Audio                 → Voice input and output
+Step 8: Add Image Input           → Multimodal AI
 ```
 
 Each step builds on the previous one. You'll test after every step to see your progress.
 
 ### Prerequisites
 
-- Google Cloud account with billing enabled
-- [Google AI Studio](https://aistudio.google.com) API key
-- Basic Python and async/await knowledge
-- Web browser with microphone access (Chrome recommended)
+- Google Cloud account with [billing enabled](https://cloud.google.com/billing/docs/how-to/modify-project)
+- Basic Python and async programming (async/await) knowledge
+- Web browser with microphone and web camera access (Chrome recommended)
 
 ### Time Estimate
 
@@ -140,32 +138,24 @@ Each step builds on the previous one. You'll test after every step to see your p
 
 ## Environment Setup (10 min)
 
-Cloud Shell Editor provides a browser-based development environment with VS Code functionality. No local setup required!
+[Cloud Shell Editor](https://cloud.google.com/shell/docs/editor-overview) provides a browser-based development environment with VS Code functionality. No local setup required!
 
 **Step 1: Open Cloud Shell Editor**
 
-We'll use Google's browser-based IDE so you don't need to install anything locally.
-
 Navigate to [ide.cloud.google.com](https://ide.cloud.google.com) in your browser.
-
-Alternatively:
-- Go to [shell.cloud.google.com](https://shell.cloud.google.com)
-- Click "Open Editor" in the toolbar
 
 ![](assets/cloud_shell_editor.png)
 
-**Step 2: Create Project Structure**
+**Step 2: Download Workshop Files**
 
-We'll create the folder structure for our bidi-streaming application with directories for the backend, frontend assets, and agent code.
-
-Open a terminal in Cloud Shell Editor (Terminal → New Terminal) and run:
+Open a terminal in Cloud Shell Editor (Terminal → New Terminal) and download the workshop files:
 
 ```bash
-mkdir -p ~/bidi-workshop/app/static/js
-mkdir -p ~/bidi-workshop/app/static/css
-mkdir -p ~/bidi-workshop/app/my_agent
-cd ~/bidi-workshop
+mkdir -p ~/bidi-workshop && cd ~/bidi-workshop
+curl -L https://raw.githubusercontent.com/kazunori279/adk-streaming-guide/main/workshops/src.tar.gz | tar xz
 ```
+
+This downloads all Python source files, agent definition, and frontend assets. Each `stepN_main.py` file is a complete, working version for that step.
 
 Then open the project folder in the editor:
 
@@ -227,7 +217,7 @@ Replace `your_project_id` with your Google Cloud project ID.
 
 **Step 5: Set Up Authentication**
 
-Configure Application Default Credentials (ADC) for Vertex AI access:
+Configure [Application Default Credentials (ADC)](https://cloud.google.com/docs/authentication/application-default-credentials) for Vertex AI access:
 
 ```bash
 gcloud auth application-default login
@@ -254,21 +244,6 @@ This installs the bidi-workshop package and all required dependencies including:
 - [`fastapi`](https://fastapi.tiangolo.com/) - Web framework
 - [`uvicorn`](https://www.uvicorn.org/) - ASGI server
 - [`python-dotenv`](https://pypi.org/project/python-dotenv/) - Environment variable management
-
-**Step 7: Download Workshop Files**
-
-Download all workshop files including Python source files, agent definition, and frontend assets:
-
-```bash
-cd ~/bidi-workshop/app
-
-# Download all workshop files
-curl -L https://github.com/kazunori279/adk-streaming-guide/raw/main/workshops/src.tar.gz | tar xz --strip-components=1
-
-cd ~/bidi-workshop
-```
-
-> **Tip**: Each `stepN_main.py` file is a complete, working version for that step. Copy it to `main.py` to use: `cp step1_main.py main.py`
 
 ### Understanding the Directory Structure
 
@@ -334,7 +309,7 @@ The architecture consists of three main layers:
 
 | Layer | Components | Purpose |
 |-------|------------|---------|
-| **Client** | Browser, WebSocket, AudioWorklet | Captures input, plays audio, displays UI |
+| **Client** | Browser, WebSocket, [AudioWorklet](https://developer.mozilla.org/en-US/docs/Web/API/AudioWorklet) | Captures input, plays audio, displays UI |
 | **Server** | FastAPI, ADK Runner, LiveRequestQueue | Routes messages, manages sessions, orchestrates agent |
 | **AI** | Gemini Live API, Agent, Tools | Processes input, generates responses, executes tools |
 
@@ -482,6 +457,23 @@ agent = Agent(
 ```
 
 The Agent is **stateless**—it defines behavior, not conversation state. The same agent instance serves all users.
+
+### Model Architectures
+
+The `model` parameter determines which Gemini model powers your agent. Two fundamentally different architectures are available for voice AI:
+
+**Native Audio models** process audio end-to-end without text intermediates. They produce more natural prosody, support an extended voice library, and enable advanced features like affective dialog (emotional adaptation) and proactivity (model-initiated responses). The current model is `gemini-live-2.5-flash-native-audio`.
+
+**Half-Cascade models** convert audio to text, process it, then synthesize speech. They support both TEXT and AUDIO response modalities, offering faster text responses and more predictable tool execution. The model `gemini-2.0-flash-live-001` was deprecated in December 2025.
+
+| Feature | Native Audio | Half-Cascade |
+|---------|--------------|--------------|
+| Response modalities | AUDIO only | TEXT or AUDIO |
+| Speech quality | More natural prosody | Standard TTS |
+| Advanced features | Affective dialog, proactivity | Limited |
+| Tool execution | Works but less predictable | More reliable |
+
+> **Choosing the right model:** For natural conversation with emotional awareness, use native audio. For applications prioritizing tool execution reliability or needing text output, test thoroughly with native audio before committing.
 
 ### Client Code: No Changes Needed
 
@@ -1008,11 +1000,11 @@ live_request_queue.send_content(content)
 live_request_queue.send_realtime(audio_blob)
 ```
 
-**VAD (Voice Activity Detection)**: The Live API automatically detects when you stop speaking and triggers a response—no manual "end of turn" signal needed.
+**[VAD (Voice Activity Detection)](https://ai.google.dev/gemini-api/docs/live-guide#voice-activity-detection-vad)**: The Live API automatically detects when you stop speaking and triggers a response—no manual "end of turn" signal needed.
 
 ### Client Code: Audio Capture with AudioWorklet
 
-The frontend captures microphone audio using the Web Audio API with AudioWorklet for low-latency processing:
+The frontend captures microphone audio using the [Web Audio API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Audio_API) with AudioWorklet for low-latency processing:
 
 **Setting up the audio pipeline (audio-recorder.js:7-38):**
 
@@ -1434,23 +1426,6 @@ finally:
     live_request_queue.close()
 ```
 
-### Why ADK Over Raw Live API?
-
-Now that you've built a complete streaming application, here's what ADK saved you from implementing yourself:
-
-![Raw Live API vs. ADK Bidi-streaming](assets/live_vs_adk.png)
-
-| Capability | Raw Live API | ADK Bidi-streaming |
-|------------|--------------|-------------------|
-| Agent Framework | Build from scratch | Single/multi-agent with tools, evaluation, security |
-| Tool Execution | Manual handling | Automatic parallel execution |
-| Connection Management | Manual reconnection | Transparent session resumption |
-| Event Model | Custom structures | Unified, typed Event objects |
-| Async Framework | Manual coordination | LiveRequestQueue + run_live() generator |
-| Session Persistence | Manual implementation | Built-in SQL, Vertex AI, or in-memory |
-
-> **The bottom line:** ADK reduces months of infrastructure development to days of application development. You focus on what your agent does, not how streaming works.
-
 ### Resources
 
 | Resource | URL |
@@ -1465,7 +1440,7 @@ Now that you've built a complete streaming application, here's what ADK saved yo
 
 1. **Read the full guide**: https://google.github.io/adk-docs/streaming/dev-guide/
 2. **Explore multi-agent**: Create agents that hand off conversations
-3. **Deploy to Cloud Run**: Scale your streaming app
+3. **Deploy to [Cloud Run](https://cloud.google.com/run)**: Scale your streaming app
 4. **Add session resumption**: Handle disconnections gracefully
 5. **Add custom tools**: Build tools that integrate with your backend services
 
@@ -1519,5 +1494,6 @@ GOOGLE_CLOUD_LOCATION=us-central1
 GOOGLE_GENAI_USE_VERTEXAI=TRUE
 
 # For Google AI Studio (alternative)
+# Get your API key at https://aistudio.google.com/
 GOOGLE_API_KEY=your_google_ai_studio_api_key
 ```
