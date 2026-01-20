@@ -165,22 +165,13 @@ Then open the project folder in the editor:
 
 **Step 3: Configure Environment Variables**
 
-We'll configure the application to use Vertex AI, which automatically authenticates using your Cloud Shell credentials.
-
-Create a new `.env` file in the `app/` directory:
-
-1. Right-click on the `app` folder in the Explorer panel
-2. Select **New File**
-3. Name it `.env`
-4. Add the following content:
+Edit `app/.env` and replace `your_project_id` with your Google Cloud project ID:
 
 ```bash
 GOOGLE_CLOUD_PROJECT=your_project_id
 GOOGLE_CLOUD_LOCATION=us-central1
 GOOGLE_GENAI_USE_VERTEXAI=TRUE
 ```
-
-Replace `your_project_id` with your Google Cloud project ID.
 
 > **Finding your Project ID**: Click the project dropdown in the Cloud Console header to see your project ID.
 
@@ -222,7 +213,7 @@ After completing the setup, your project structure looks like this:
 bidi-workshop/
 ├── pyproject.toml                    # Python package configuration (downloaded)
 └── app/                              # Main application directory
-    ├── .env                          # Environment variables (you create this)
+    ├── .env                          # Environment variables (edit with your project ID)
     ├── main.py                       # Active server file (copy from stepN_main.py)
     ├── step1_main.py                 # Step 1: Minimal WebSocket server
     ├── step3_main.py                 # Step 3: Application initialization
@@ -259,6 +250,7 @@ cp step1_main.py main.py  # Copy step file to main.py
 | File | Purpose |
 |------|---------|
 | `pyproject.toml` | Python package configuration and dependencies |
+| `app/.env` | Environment variables (edit with your project ID) |
 | `app/stepN_main.py` | Complete server implementation for each step |
 | `app/my_agent/agent.py` | Agent definition (model, tools, instruction) |
 | `app/static/*` | Frontend: HTML, CSS, WebSocket, audio capture/playback |
