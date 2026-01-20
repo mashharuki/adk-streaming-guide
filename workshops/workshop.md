@@ -254,35 +254,6 @@ The architecture consists of three main layers:
 | **Server** | FastAPI, ADK Runner, LiveRequestQueue | Routes messages, manages sessions, orchestrates agent |
 | **AI** | Gemini Live API, Agent, Tools | Processes input, generates responses, executes tools |
 
-### The 4-Phase Lifecycle
-
-Every bidi-streaming session follows this lifecycle:
-
-![4-Phase Application Lifecycle](assets/app_lifecycle.png)
-
-| Phase | When | What Happens |
-|-------|------|--------------|
-| **1. Application Init** | Server startup | Create Agent, SessionService, Runner (once, shared) |
-| **2. Session Init** | WebSocket connects | Create RunConfig, get/create Session, create LiveRequestQueue |
-| **3. Bidi-streaming** | Active conversation | Concurrent upstream (input) and downstream (events) tasks |
-| **4. Termination** | Connection closes | Close LiveRequestQueue, cleanup resources |
-
-This lifecycle pattern is fundamental to all streaming applications. You'll implement each phase as you build through the steps.
-
-### LiveRequestQueue: The Input Channel
-
-The `LiveRequestQueue` is your primary interface for sending input to the model:
-
-![LiveRequestQueue Methods](assets/live_req_queue.png)
-
-| Method | Use Case | Triggers Response? |
-|--------|----------|-------------------|
-| `send_content(content)` | Text messages | Yes, immediately |
-| `send_realtime(blob)` | Audio/image streams | After VAD detects silence |
-| `send_activity_start()` | Signal user is active | No |
-| `send_activity_end()` | Signal user stopped | May trigger response |
-| `close()` | End the session | N/A |
-
 ---
 
 ## Step 1: Minimal WebSocket Server (10 min)
@@ -298,12 +269,46 @@ cd ~/bidi-workshop/app
 cp step1_main.py main.py
 ```
 
-Open `main.py` in the editor to examine the code. Key points:
+Open `main.py` in the editor to examine the code.
 
-- **FastAPI app**: Creates the web server
-- **Static files mount**: Serves the frontend HTML/CSS/JS
-- **WebSocket endpoint**: Accepts connections at `/ws/{user_id}/{session_id}`
-- **Echo response**: Returns the received text in ADK event format
+**step1_main.py:9-14** - Create FastAPI app and serve static files:
+```python
+# Create FastAPI application
+app = FastAPI()
+
+# Serve static files (HTML, CSS, JS)
+static_dir = Path(__file__).parent / "static"
+app.mount("/static", StaticFiles(directory=static_dir), name="static")
+```
+
+FastAPI is a modern Python web framework that provides built-in WebSocket support. The `StaticFiles` middleware serves our frontend assets (HTML, CSS, JavaScript) from the `static/` directory.
+
+**step1_main.py:23-30** - WebSocket endpoint accepts connections:
+```python
+@app.websocket("/ws/{user_id}/{session_id}")
+async def websocket_endpoint(
+    websocket: WebSocket,
+    user_id: str,
+    session_id: str,
+) -> None:
+    """WebSocket endpoint - currently just echoes messages."""
+    await websocket.accept()
+```
+
+The `@app.websocket` decorator creates a WebSocket endpoint. Path parameters `{user_id}` and `{session_id}` are extracted from the URL and passed to the function. Calling `websocket.accept()` completes the WebSocket handshake.
+
+**step1_main.py:44-50** - Echo response in ADK event format:
+```python
+response = {
+    "content": {
+        "parts": [{"text": f"Echo: {text_data}"}]
+    }
+}
+await websocket.send_text(json.dumps(response))
+await websocket.send_text(json.dumps({"turnComplete": True}))
+```
+
+At this point, we're just echoing back the input message without using any ADK functionality yet. However, the response follows ADK's event format: `content.parts[].text` for text responses, and `turnComplete: true` to signal the response is finished. We'll explore this event format in detail in Step 6. The frontend already understands this format, so our echo appears as a chat message.
 
 ### Test Step 1
 
@@ -314,12 +319,30 @@ cd ~/bidi-workshop/app
 python -m uvicorn main:app --reload --host 0.0.0.0 --port 8080
 ```
 
-Open Web Preview (globe icon → Preview on port 8080).
+You should see:
+
+```
+INFO:     Uvicorn running on http://0.0.0.0:8080 (Press CTRL+C to quit)
+INFO:     Started reloader process [...] using StatReload
+INFO:     Started server process [...]
+INFO:     Application startup complete.
+```
+
+Click **Web Preview** button and choose **Preview on port 8080**.
+
+![Web Preview button](assets/web_preview.png)
+
+You'll see the demo screen in your browser. Make sure the **Connected** indicator appears in the top right corner—this confirms the WebSocket connection is working.
+
+![Connected](assets/connected.png)
 
 **Test it:**
 1. Type "Hello" in the text input
 2. Click Send
 3. You should see "Echo: {"type": "text", "text": "Hello"}" in the chat
+
+![Echo: hello](assets/echo_hello.png)
+
 
 > **What you built**: A WebSocket server that receives messages and sends responses. The frontend displays it as a chat message because the response follows ADK's event format.
 
@@ -372,9 +395,16 @@ connectWebsocket();
 | `onmessage` | Receives all server events (text, audio, transcriptions) |
 | Auto-reconnect | Handles network interruptions gracefully |
 
-**Why WebSocket?** Unlike HTTP which is request-response, WebSocket maintains a persistent connection allowing the server to push events to the client at any time—essential for streaming AI responses.
+**Why not REST API?** Traditional REST APIs use request-response patterns—you send a request and wait for the complete response. For streaming AI, we need the server to push events as they're generated. Both WebSocket and SSE (Server-Sent Events) solve this:
 
-**Checkpoint**: You have a working WebSocket connection!
+| Protocol | Pros | Cons |
+|----------|------|------|
+| **WebSocket** | Bidirectional, supports binary data (audio/image), lower latency | More complex setup with proxies/load balancers |
+| **SSE** | Simpler, works over HTTP, better proxy support | Needs two endpoints for bidirectional streaming, requires base64 encoding for binary data |
+
+This workshop uses WebSocket for bidirectional audio streaming, but you can also choose to use SSE for text-only applications.
+
+**Checkpoint**: You set up a FastAPI app with a WebSocket endpoint and established a working connection with the frontend!
 
 ---
 
@@ -388,10 +418,11 @@ The agent files were downloaded during setup. Open `my_agent/agent.py` in the ed
 
 ### Understand the Agent
 
+**my_agent/agent.py:7-16**
 ```python
 agent = Agent(
     name="workshop_agent",        # Identifier for logs and debugging
-    model=os.getenv(...),         # Which Gemini model to use
+    model="gemini-live-2.5-flash-native-audio",  # Native audio model
     instruction="...",            # System prompt - shapes personality
     tools=[google_search],        # Tools the agent can call
 )
@@ -449,6 +480,21 @@ ADK requires three components initialized once at startup:
 2. **SessionService** - Stores conversation history
 3. **Runner** - Orchestrates streaming
 
+### The 4-Phase Lifecycle
+
+Every bidi-streaming session follows this lifecycle:
+
+![4-Phase Application Lifecycle](assets/app_lifecycle.png)
+
+| Phase | When | What Happens |
+|-------|------|--------------|
+| **1. Application Init** | Server startup | Create Agent, SessionService, Runner (once, shared) |
+| **2. Session Init** | WebSocket connects | Create RunConfig, get/create Session, create LiveRequestQueue |
+| **3. Bidi-streaming** | Active conversation | Concurrent upstream (input) and downstream (events) tasks |
+| **4. Termination** | Connection closes | Close LiveRequestQueue, cleanup resources |
+
+This lifecycle pattern is fundamental to all streaming applications. You'll implement each phase as you build through the steps.
+
 ### Activate Step 3
 
 Copy the step 3 source file to `main.py`:
@@ -471,6 +517,7 @@ After the server reloads, send a message. You should see "ADK Ready! Model: gemi
 
 ### Understand the Components
 
+**step3_main.py:31-39**
 ```python
 # SessionService: Stores conversation history
 session_service = InMemorySessionService()  # Memory-based (lost on restart)
@@ -531,6 +578,7 @@ Restart and test. Open a second browser tab with the same URL.
 
 ### Understand RunConfig
 
+**step4_main.py:56-61**
 ```python
 run_config = RunConfig(
     streaming_mode=StreamingMode.BIDI,  # WebSocket bidirectional
@@ -569,17 +617,22 @@ One concept trips up many developers: ADK Session vs Live API session.
 
 ### Understand LiveRequestQueue
 
+**step4_main.py:76**
 ```python
 live_request_queue = LiveRequestQueue()
 ```
 
-This is the **upstream channel** for sending input to the model:
+The `LiveRequestQueue` is your primary interface for sending input to the model:
 
-| Method | Use Case |
-|--------|----------|
-| `send_content(content)` | Text messages (triggers response) |
-| `send_realtime(blob)` | Audio/image chunks (streaming) |
-| `close()` | End the session |
+![LiveRequestQueue Methods](assets/live_req_queue.png)
+
+| Method | Use Case | Triggers Response? |
+|--------|----------|-------------------|
+| `send_content(content)` | Text messages | Yes, immediately |
+| `send_realtime(blob)` | Audio/image streams | After VAD detects silence |
+| `send_activity_start()` | Signal user is active | No |
+| `send_activity_end()` | Signal user stopped | May trigger response |
+| `close()` | End the session | N/A |
 
 ---
 
@@ -617,6 +670,7 @@ The message goes to the model, but we're not receiving responses yet. That's nex
 
 ### Understand the Upstream Flow
 
+**step5_main.py:75-86**
 ```python
 # Parse JSON message from client
 json_message = json.loads(text_data)
@@ -721,6 +775,7 @@ Open the Event Console (right panel) to see raw events.
 
 ### Understand run_live()
 
+**step6_main.py:82-93**
 ```python
 async for event in runner.run_live(
     user_id=user_id,              # Identifies the user
