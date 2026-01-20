@@ -1,28 +1,48 @@
-# ADK Bidi-streaming Workshop
+# ADK Bidi-streaming Workshop: Build Your Own Real-Time Voice AI
 
-## Workshop Overview
+## What is Bidi-streaming?
 
-### What is Bidi-streaming?
+**Bidirectional streaming** (bidi-streaming) enables simultaneous two-way communication between your application and AI models. Unlike traditional request-response patterns where you send a complete message and wait for a complete reply, bidi-streaming allows:
 
-Bidi-streaming (Bidirectional streaming) represents a fundamental shift from traditional AI interactions. Instead of the rigid "ask-and-wait" pattern, it enables **real-time, two-way communication** where both human and AI can speak, listen, and respond simultaneously. This creates natural, human-like conversations with immediate responses and the ability to interrupt ongoing interactions.
-
-Think of the difference between sending emails and having a phone conversation. Traditional AI interactions are like emails—you send a complete message, wait for a complete response, then send another. Bidi-streaming is like a phone conversation—fluid, natural, with the ability to interrupt, clarify, and respond in real-time.
+- **Continuous input**: Stream audio, video, or text as it's captured
+- **Real-time output**: Receive AI responses as they're generated
+- **Natural interruption**: Users can interrupt the AI mid-response, just like in human conversation
 
 ```mermaid
 sequenceDiagram
-    participant Client as User
-    participant Agent
+    participant User
+    participant App
+    participant AI
 
-    Client->>Agent: "Hi!"
-    Client->>Agent: "Explain the history of Japan"
-    Agent->>Client: "Hello!"
-    Agent->>Client: "Sure! Japan's history is a..." (partial content)
-    Client->>Agent: "Ah, wait."
+    Note over User,AI: Traditional Request-Response
+    User->>App: Complete message
+    App->>AI: Send request
+    AI-->>App: Wait for full response...
+    App-->>User: Display response
 
-    Agent->>Client: "OK, how can I help?" [interrupted: true]
+    Note over User,AI: Bidirectional Streaming
+    User->>App: Start speaking...
+    App->>AI: Stream audio chunks
+    AI-->>App: Stream response tokens
+    App-->>User: Play audio immediately
+    User->>App: [Interrupts!]
+    AI-->>App: [Stops immediately]
 ```
 
-The diagram above shows a key feature of Bidi-streaming: **interruption**. The user can interrupt the agent mid-response, and the agent immediately stops and addresses the new input—just like a natural conversation.
+**Why this matters:** Bidi-streaming makes AI conversations feel natural. The AI can respond while you're still providing context, and you can interrupt it when you've heard enough—just like talking to a human.
+
+### What is ADK Bidi-streaming?
+
+The **Agent Development Kit (ADK)** provides a high-level abstraction over the Gemini Live API, handling the complex plumbing of real-time streaming so you can focus on building your application.
+
+![ADK abstracts away the complexity of Live API communication](assets/bidi_plumbing.webp)
+
+ADK Bidi-streaming manages:
+
+- **Connection lifecycle**: Establishing, maintaining, and recovering WebSocket connections
+- **Message routing**: Directing audio, text, and images to the right handlers
+- **Session state**: Persisting conversation history across reconnections
+- **Tool execution**: Automatically calling and resuming from function calls
 
 ### Real-World Use Cases
 
@@ -36,24 +56,13 @@ The diagram above shows a key feature of Bidi-streaming: **interruption**. The u
 
 - **Financial Services**: A client reviews their portfolio while the agent displays charts and simulates trade impacts. The client can share their screen to discuss specific news articles.
 
-**Shopper's Concierge 2 Demo**: Real-time Agentic RAG demo for e-commerce, built with [ADK Bidi-streaming](https://google.github.io/adk-docs/streaming/dev-guide/part1/) and Vertex AI Vector Search, Embeddings, Feature Store and Ranking API
+**Shopper's Concierge 2 Demo**: Real-time Agentic RAG demo for e-commerce, built with ADK Bidi-streaming and Vertex AI Vector Search, Embeddings, Feature Store and Ranking API:
 
 [![Shopper's Concierge 2 Demo](https://img.youtube.com/vi/Hwx94smxT_0/maxresdefault.jpg)](https://www.youtube.com/watch?v=Hwx94smxT_0)
 
-### What is ADK Bidi-streaming?
+### Learn More: Developer Guide
 
-Building real-time voice AI is hard. You need WebSocket connections that stay alive, audio streaming that doesn't lag, interruption handling that feels natural, and session state that persists across reconnections. The complexity adds up fast—what should take weeks often stretches into months of infrastructure work. ADK lets you skip all that plumbing and focus on what actually matters: your agent's behavior and your users' experience.
-
-![](assets/bidi_plumbing.webp)
-
-ADK Bidi-streaming enables real-time, two-way communication between your application and [Gemini](https://deepmind.google/technologies/gemini/) models through the [Live API](https://ai.google.dev/gemini-api/docs/live). Unlike traditional request-response patterns, bidirectional streaming allows:
-
-- **Continuous input streaming**: Send audio, text, and images in real-time without waiting for responses
-- **Concurrent output streaming**: Receive model responses, transcriptions, and events while still sending input
-- **Natural conversations**: Enable voice-based interactions with sub-second latency
-- **Multimodal experiences**: Combine text, audio, images, and video in a single session
-
-For a comprehensive deep-dive, we provide the [ADK Bidi-streaming Developer Guide](https://google.github.io/adk-docs/streaming/dev-guide/part1/)—a 5-part series covering architecture to production deployment:
+For a comprehensive deep-dive, see the [ADK Bidi-streaming Developer Guide](https://google.github.io/adk-docs/streaming/dev-guide/part1/)—a 5-part series covering architecture to production deployment:
 
 | Part | Focus | What You'll Learn |
 |------|-------|-------------------|
@@ -63,42 +72,79 @@ For a comprehensive deep-dive, we provide the [ADK Bidi-streaming Developer Guid
 | [Part 4](https://google.github.io/adk-docs/streaming/dev-guide/part4/) | Configuration | Session management, quotas, production controls |
 | [Part 5](https://google.github.io/adk-docs/streaming/dev-guide/part5/) | Multimodal | Audio specs, model architectures, advanced features |
 
-### ADK Bidi-streaming hands-on workshop
+### Model Architectures
 
-This hands-on workshop teaches you how to build real-time, bidirectional streaming AI applications based on the dev guide. You will deploy and explore the bidi-demo application on [Cloud Shell Editor](https://cloud.google.com/shell/docs/editor-overview), learning the core concepts of ADK Bidi-streaming through practical experimentation.
+Two fundamentally different architectures power voice AI in the Live API:
+
+**Native Audio models** process audio end-to-end without text intermediates. They produce more natural prosody, support an extended voice library, and enable advanced features like affective dialog (emotional adaptation) and proactivity (model-initiated responses). The current model is `gemini-live-2.5-flash-native-audio`.
+
+**Half-Cascade models** convert audio to text, process it, then synthesize speech. They support both TEXT and AUDIO response modalities, offering faster text responses and more predictable tool execution. The model `gemini-2.0-flash-live-001` was deprecated in December 2025.
+
+| Feature | Native Audio | Half-Cascade |
+|---------|--------------|--------------|
+| Response modalities | AUDIO only | TEXT or AUDIO |
+| Speech quality | More natural prosody | Standard TTS |
+| Advanced features | Affective dialog, proactivity | Limited |
+| Tool execution | Works but less predictable | More reliable |
+
+> **Choosing the right model:** For natural conversation with emotional awareness, use native audio. For applications prioritizing tool execution reliability or needing text output, test thoroughly with native audio before committing.
+
+---
+
+## Workshop Overview
+
+### What You'll Build
+
+In this hands-on workshop, you'll build a complete bidirectional streaming AI application from scratch. By the end, you'll have a working voice AI that can:
+
+- Accept text, audio, and image input
+- Respond with streaming text or natural speech
+- Handle interruptions naturally
+- Use tools like Google Search
+
+Unlike reading documentation, you'll **write every line of code yourself**, understanding each component as you build it.
 
 ![ADK Bidi-streaming Demo](../docs/assets/bidi-demo-screen.png)
 
-### Learning Objectives
+### Learning Approach
 
-By the end of this workshop, you will be able to:
+We follow an incremental build approach:
 
-1. Set up and run a Bidi-streaming application on Cloud Shell
-2. Understand ADK's 4-phase streaming lifecycle
-3. Learn how to implement bidirectional communication with LiveRequestQueue
-4. Process streaming events from run_live()
-5. Configure RunConfig for different modalities
-6. Work with audio, image, and video inputs
+```
+Step 1: Minimal WebSocket server → "Hello World" response
+Step 2: Add the Agent            → AI-powered responses
+Step 3: Application Initialization → Runner and session service
+Step 4: Session Initialization   → RunConfig and LiveRequestQueue
+Step 5: Upstream Task            → Client to queue communication
+Step 6: Downstream Task          → Events to client streaming
+Step 7: Add Audio                → Voice input and output
+Step 8: Add Image Input          → Multimodal AI
+Step 9: Production Polish        → Error handling & cleanup
+```
+
+Each step builds on the previous one. You'll test after every step to see your progress.
 
 ### Prerequisites
 
 - Google Cloud account with billing enabled
-- [Google AI Studio](https://aistudio.google.com) API key (GOOGLE_API_KEY)
-- Basic Python knowledge
-- Familiarity with [async/await](https://docs.python.org/3/library/asyncio.html) concepts
+- [Google AI Studio](https://aistudio.google.com) API key
+- Basic Python and async/await knowledge
 - Web browser with microphone access (Chrome recommended)
+
+### Time Estimate
+
+- **Full workshop**: ~90 minutes
+- **Quick version** (Steps 1-4 only): ~45 minutes
 
 ---
 
-## Section 1: Introduction & Environment Setup (10 min)
-
-To help you understand the concepts in this guide, we provide a working demo application that showcases ADK bidirectional streaming in action. This FastAPI-based demo implements the complete streaming lifecycle with a practical, real-world architecture.
-
-### 1.1 Cloud Shell Editor Setup
+## Environment Setup (10 min)
 
 Cloud Shell Editor provides a browser-based development environment with VS Code functionality. No local setup required!
 
 **Step 1: Open Cloud Shell Editor**
+
+We'll use Google's browser-based IDE so you don't need to install anything locally.
 
 Navigate to [ide.cloud.google.com](https://ide.cloud.google.com) in your browser.
 
@@ -108,25 +154,59 @@ Alternatively:
 
 ![](assets/cloud_shell_editor.png)
 
-**Step 2: Clone the Repository**
+**Step 2: Create Project Structure**
+
+We'll create the folder structure for our bidi-streaming application with directories for the backend, frontend assets, and agent code.
 
 Open a terminal in Cloud Shell Editor (Terminal → New Terminal) and run:
 
 ```bash
-git clone https://github.com/google/adk-samples.git
+mkdir -p ~/bidi-workshop/app/static/js
+mkdir -p ~/bidi-workshop/app/static/css
+mkdir -p ~/bidi-workshop/app/my_agent
+cd ~/bidi-workshop
 ```
 
-![](assets/clone_repository.png)
-
-**Step 3: Open the bidi-demo Folder**
-
-In Cloud Shell Editor, open the bidi-demo project folder:
+Then open the project folder in the editor:
 
 1. Click **File** → **Open Folder** in the menu bar
-2. Navigate to `adk-samples/python/agents/bidi-demo`
+2. Navigate to `bidi-workshop`
 3. Click **OK**
 
+**Step 3: Create pyproject.toml**
+
+This file defines our Python package and its dependencies, including the ADK and FastAPI.
+
+Create the Python package configuration. In Cloud Shell Editor:
+
+1. Right-click on `bidi-workshop` folder → **New File**
+2. Name it `pyproject.toml`
+3. Add this content:
+
+```toml
+[project]
+name = "bidi-workshop"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = [
+    "google-adk>=1.22.1",
+    "fastapi>=0.115.0",
+    "uvicorn>=0.32.0",
+    "python-dotenv>=1.0.0",
+    "websockets>=13.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
+```
+
 **Step 4: Configure Environment Variables**
+
+We'll configure the application to use Vertex AI, which automatically authenticates using your Cloud Shell credentials.
 
 Create a new `.env` file in the `app/` directory:
 
@@ -136,680 +216,813 @@ Create a new `.env` file in the `app/` directory:
 4. Add the following content:
 
 ```bash
-GOOGLE_API_KEY=your_api_key_here
-DEMO_AGENT_MODEL=gemini-2.5-flash-native-audio-preview-12-2025
+GOOGLE_CLOUD_PROJECT=your_project_id
+GOOGLE_CLOUD_LOCATION=us-central1
+GOOGLE_GENAI_USE_VERTEXAI=TRUE
 ```
 
-Replace `your_api_key_here` with your actual Google AI Studio API key.
+Replace `your_project_id` with your Google Cloud project ID.
 
-> **Getting an API Key**: Visit [aistudio.google.com](https://aistudio.google.com) → Get API Key (at the bottom left) → Create API key
+> **Finding your Project ID**: Click the project dropdown in the Cloud Console header to see your project ID.
 
-**Step 5: Install Dependencies**
+**Step 5: Set Up Authentication**
+
+Configure Application Default Credentials (ADC) for Vertex AI access:
+
+```bash
+gcloud auth application-default login
+```
+
+Follow the prompts to authenticate. This creates credentials that ADK uses to access Vertex AI.
+
+> **Verify authentication**: Run `gcloud auth application-default print-access-token` to confirm credentials are configured.
+
+**Step 6: Install Dependencies**
+
+Now we'll install all the Python packages defined in pyproject.toml.
 
 Open a terminal in Cloud Shell Editor (Terminal → New Terminal) and run:
 
 ```bash
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -e .
 ```
 
-This installs the bidi-demo package and all required dependencies including:
+This installs the bidi-workshop package and all required dependencies including:
 - `google-adk` - Agent Development Kit
 - [`fastapi`](https://fastapi.tiangolo.com/) - Web framework
 - [`uvicorn`](https://www.uvicorn.org/) - ASGI server
 - [`python-dotenv`](https://pypi.org/project/python-dotenv/) - Environment variable management
 
-### 1.2 Understanding the Directory Structure
+**Step 7: Download Workshop Files**
 
-After cloning, explore the project structure in Cloud Shell Editor:
+Download all workshop files including Python source files, agent definition, and frontend assets:
+
+```bash
+cd ~/bidi-workshop/app
+
+# Download all workshop files
+curl -L https://github.com/kazunori279/adk-streaming-guide/raw/main/workshops/src.tar.gz | tar xz --strip-components=1
+
+cd ~/bidi-workshop
+```
+
+> **Tip**: Each `stepN_main.py` file is a complete, working version for that step. Copy it to `main.py` to use: `cp step1_main.py main.py`
+
+### Understanding the Directory Structure
+
+After completing the setup, your project structure looks like this:
 
 ```
-bidi-demo/
-├── app/                              # Main application directory
-│   ├── main.py                       # FastAPI server with WebSocket endpoint
-│   ├── .env                          # Environment variables (API key, model)
-│   ├── google_search_agent/          # Agent definition
-│   │   └── agent.py                  # Agent configuration (model, tools, instruction)
-│   └── static/                       # Frontend assets
-│       ├── index.html                # Main HTML page
-│       ├── css/
-│       │   └── styles.css            # UI styling
-│       └── js/
-│           ├── app.js                # Main app logic, WebSocket, event handling
-│           ├── audio-recorder.js     # Microphone capture (16kHz)
-│           ├── audio-player.js       # Audio playback (24kHz)
-│           ├── pcm-recorder-processor.js  # [AudioWorklet](https://developer.mozilla.org/en-US/docs/Web/API/AudioWorklet) for recording
-│           └── pcm-player-processor.js    # AudioWorklet for playback
+bidi-workshop/
 ├── pyproject.toml                    # Python package configuration
-└── README.md                         # Project documentation
+└── app/                              # Main application directory
+    ├── .env                          # Environment variables (API key, model)
+    ├── main.py                       # Active server file (copy from stepN_main.py)
+    ├── step1_main.py                 # Step 1: Minimal WebSocket server
+    ├── step3_main.py                 # Step 3: Application initialization
+    ├── step4_main.py                 # Step 4: Session initialization
+    ├── step5_main.py                 # Step 5: Upstream task
+    ├── step6_main.py                 # Step 6: Downstream task
+    ├── step7_main.py                 # Step 7: Bidirectional audio
+    ├── step8_main.py                 # Step 8: Image input
+    ├── my_agent/                     # Agent package (pre-downloaded)
+    │   ├── __init__.py               # Package initialization
+    │   └── agent.py                  # Agent definition
+    └── static/                       # Frontend assets (pre-downloaded)
+        ├── index.html                # Main HTML page
+        ├── css/
+        │   └── style.css             # UI styling
+        └── js/
+            ├── app.js                # WebSocket, event handling, UI logic
+            ├── audio-recorder.js     # Microphone capture (16kHz PCM)
+            ├── audio-player.js       # Audio playback (24kHz PCM)
+            ├── pcm-recorder-processor.js  # AudioWorklet for recording
+            └── pcm-player-processor.js    # AudioWorklet for playback
 ```
 
-**Key Files to Explore:**
+**How to use the step files:**
+
+Each step has a complete, working `stepN_main.py` file. To use a step:
+
+```bash
+cp step1_main.py main.py  # Copy step file to main.py
+```
+
+**Pre-downloaded files:**
 
 | File | Purpose |
 |------|---------|
-| `app/main.py` | Server-side: FastAPI app, WebSocket endpoint, upstream/downstream tasks |
-| `app/google_search_agent/agent.py` | Agent definition: model, tools, instruction |
-| `app/static/js/app.js` | Client-side: WebSocket connection, event handling, UI updates |
-| `app/static/js/audio-*.js` | Client-side: Audio capture and playback with [Web Audio API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Audio_API) |
+| `stepN_main.py` | Complete server implementation for each step |
+| `my_agent/agent.py` | Agent definition (model, tools, instruction) |
+| `static/*.js` | Frontend: WebSocket, audio capture/playback, UI |
 
-Take a moment to open these files in the editor. We'll walk through them in detail in Section 4.
-
-### 1.3 Run the Demo
-
-Let's verify your setup by running the demo application.
-
-**Step 1: Start the Server**
-
-In the terminal, navigate to the app directory and start the server:
-
-```bash
-cd app
-python -m uvicorn main:app --reload --host 0.0.0.0 --port 8080
-```
-
-You should see output like:
-```
-INFO:     Will watch for changes in these directories: ['/home/kazsato/adk-samples/python/agents/bidi-demo/app']
-INFO:     Uvicorn running on http://0.0.0.0:8080 (Press CTRL+C to quit)
-INFO:     Started reloader process [9896] using WatchFiles
-INFO:     Started server process [9898]
-INFO:     Waiting for application startup.
-INFO:     Application startup complete.
-```
-
-**Step 2: Open the Web Preview**
-
-1. In Cloud Shell Editor, click the **Web Preview** button (globe icon) in the toolbar
-2. Select **Preview on port 8080**
-3. A new browser tab opens with the bidi-demo UI
-
-![](assets/web_preview.png)
-
-**Step 3: Test the Connection**
-
-Type a message like "Hello!" in the text input and click **Send**. If everything is configured correctly, you should receive a response from the agent.
-
-> **Tip**: Keep the server running for the rest of the workshop. You can open a new terminal (Terminal → New Terminal) if you need to run other commands.
-
-![](assets/say_hello.png)
+**Key insight:** The Python backend handles ADK integration. The JavaScript frontend handles browser APIs for audio/video. They communicate via WebSocket.
 
 ---
 
-## Section 2: Architecture Overview (15 min)
+## Architecture Overview
 
-### 2.1 High-Level Architecture
+Before diving into code, let's understand the high-level architecture and lifecycle of a bidi-streaming application.
 
-Before diving into code, you need a mental model of how the pieces connect. ADK Bidi-streaming follows a clean separation of concerns across three layers, each with distinct responsibilities:
+### High-Level Architecture
 
-![ADK Bidi-streaming High-Level Architecture](assets/Bidi_arch.jpeg)
+![High-Level Architecture of ADK Bidi-streaming](assets/Bidi_arch.jpeg)
 
-**You own the application layer.** This includes the client applications your users interact with (web, mobile, kiosk) and the transport server that manages connections. Most teams use FastAPI with [WebSockets](https://developer.mozilla.org/en-US/docs/Web/API/WebSockets_API), but any framework supporting real-time communication works. You also define your Agent—the instructions, tools, and behaviors that make your AI unique.
+The architecture consists of three main layers:
 
-**ADK handles the orchestration.** The framework provides three key components that eliminate infrastructure work:
+| Layer | Components | Purpose |
+|-------|------------|---------|
+| **Client** | Browser, WebSocket, AudioWorklet | Captures input, plays audio, displays UI |
+| **Server** | FastAPI, ADK Runner, LiveRequestQueue | Routes messages, manages sessions, orchestrates agent |
+| **AI** | Gemini Live API, Agent, Tools | Processes input, generates responses, executes tools |
 
-| Component | Purpose |
-|-----------|---------|
-| **LiveRequestQueue** | Buffers and sequences incoming messages so you don't worry about race conditions |
-| **Runner** | Manages session lifecycles and conversation state |
-| **LLM Flow** | Handles the complex protocol translation you never want to write yourself |
+### The 4-Phase Lifecycle
 
-**Google provides the AI backbone.** The Live API—available through Gemini Live API for rapid prototyping or [Vertex AI Live API](https://cloud.google.com/vertex-ai/generative-ai/docs/live-api) for enterprise production—delivers real-time, low-latency AI processing with built-in support for audio, video, and natural interruptions.
+Every bidi-streaming session follows this lifecycle:
 
-> **Why this matters:** The bidirectional arrows in the diagram aren't just decoration—they represent true concurrent communication. Users can interrupt the AI mid-sentence, just like in human conversation. This is fundamentally different from request-response APIs, and it's what makes voice AI feel natural rather than robotic.
-
-The key insight is that ADK abstracts away the complexity of managing WebSocket connections to the Live API. Your application only needs to:
-
-1. **Send input** through `LiveRequestQueue` (upstream)
-2. **Process events** from `run_live()` (downstream)
-
-ADK handles everything in between: connection management, message serialization, tool execution, and session state.
-
-### 2.2 The 4-Phase Lifecycle
-
-Every ADK Bidi-streaming application follows a predictable four-phase lifecycle. Understanding these phases is key to resource efficiency and clean code architecture.
-
-![ADK Bidi-streaming Application Lifecycle](assets/app_lifecycle.png)
+![4-Phase Application Lifecycle](assets/app_lifecycle.png)
 
 | Phase | When | What Happens |
 |-------|------|--------------|
-| **1. Application Initialization** | Server startup (once) | Create Agent, SessionService, and Runner. These are stateless, thread-safe, and shared across all connections. |
-| **2. Session Initialization** | User connects | Get/create Session, configure RunConfig, create LiveRequestQueue. Each user gets their own session context. |
-| **3. Bidi-streaming** | Active conversation | Two concurrent tasks: upstream (user input → model) and downstream (model events → user). True simultaneous communication. |
-| **4. Termination** | Connection ends | Close LiveRequestQueue to release resources. Session state persists for future reconnection. |
+| **1. Application Init** | Server startup | Create Agent, SessionService, Runner (once, shared) |
+| **2. Session Init** | WebSocket connects | Create RunConfig, get/create Session, create LiveRequestQueue |
+| **3. Bidi-streaming** | Active conversation | Concurrent upstream (input) and downstream (events) tasks |
+| **4. Termination** | Connection closes | Close LiveRequestQueue, cleanup resources |
 
-> **Key Insight**: The upstream and downstream tasks run concurrently using `asyncio.gather()`. This enables true bidirectional communication—users can interrupt the AI mid-sentence, just like in human conversation.
+This lifecycle pattern is fundamental to all streaming applications. You'll implement each phase as you build through the steps.
 
-We'll explore each phase in detail with code examples in Section 4.
+### LiveRequestQueue: The Input Channel
 
-### 2.3 Key Components
+The `LiveRequestQueue` is your primary interface for sending input to the model:
 
-Before running the demo, here's a brief overview of the core components you'll encounter:
+![LiveRequestQueue Methods](assets/live_req_queue.png)
 
-| Component | Purpose | Key Insight |
-|-----------|---------|-------------|
-| **Agent** | Defines your AI's personality, model, and tools | The `instruction` field is your system prompt |
-| **LiveRequestQueue** | Channel for sending input to the model | Use `send_content()` for text, `send_realtime()` for audio/images |
-| **run_live()** | Async generator that yields model events | Process events like text, audio, transcriptions, and tool calls |
-| **RunConfig** | Session configuration (modalities, features) | Set `response_modalities=["AUDIO"]` for voice responses |
-
-> **Coming up:** Section 4 provides complete code walkthroughs for each component with detailed explanations.
-
----
-
-## Section 3: Running the Demo (20 min)
-
-### 3.1 Text Interaction
-
-Let's start with basic text interaction:
-
-1. **Type a message** in the text input field
-2. Click "Send" or press Enter
-3. Observe the streaming response appearing word-by-word
-
-**Try these prompts:**
-
-- "Hello, who are you?"
-- "What's the weather like in Tokyo today?" (uses Google Search)
-- "Tell me a short joke"
-
-> **What to observe:** Watch the response appear word-by-word, not all at once. This is streaming in action—the server forwards events from `run_live()` as they arrive.
-
-> **Lifecycle in action:** Your text goes through the **upstream task** (`send_content()`), the model processes it, and responses flow back through the **downstream task** (`run_live()` events).
-
-#### Understanding the UI
-
-Now that you've tried text interaction, explore the demo interface:
-
-**Header Bar:**
-- **Connection Status**: Green indicator shows you're connected to the WebSocket
-- **Proactivity**: Enable the model to respond proactively (native audio models only)
-- **Affective Dialog**: Enable emotional awareness in responses (native audio models only)
-
-**Chat Area (Left Panel):**
-- Message bubbles show the conversation
-- User messages appear on the right, agent responses on the left
-- A typing indicator (...) appears during streaming responses
-
-**Input Controls:**
-- **Text input**: Type messages to the agent
-- **Send**: Submit text messages
-- **Start Audio**: Enable microphone for voice interaction
-- **📷 Camera**: Capture and send images
-
-**Event Console (Right Panel):**
-
-The Event Console displays all ADK events in real-time—this is your window into how bidi-streaming works:
-
-| Emoji | Event Type | Description |
-|-------|-----------|-------------|
-| 🔌 | WebSocket Connected | Connection established with server |
-| 💬 | User Message | Your outgoing text (upstream) |
-| 📝 | Input Transcription | Your speech converted to text |
-| 📝 | Output Transcription | Agent's speech converted to text |
-| 💭 | Text Response | Agent's text content |
-| 🔊 | Audio Response | Agent's audio content (filtered by default) |
-| 📊 | Token Usage | Prompt and response token counts |
-| ✅ | Turn Complete | Agent finished responding |
-| ⏸️ | Interrupted | User interrupted the agent |
-
-> **Tip:** Click any event entry to expand and see the full JSON payload. Use the "Show audio" checkbox to display high-frequency audio events, and "Clear" to reset the console.
-
-### 3.2 Audio Interaction
-
-Now let's try voice interaction:
-
-1. **Click the microphone button** to enable audio mode
-2. **Allow microphone access** when prompted
-3. **Speak to the agent** naturally
-4. Observe:
-   - Your speech appears as transcription (input_transcription)
-   - The agent responds with voice (audio content)
-   - Agent's speech appears as transcription (output_transcription)
-
-**Try these voice prompts:**
-
-- "Hello, can you hear me?"
-- "Search for the latest news about AI"
-- "What time is it in New York?"
-
-> **What to observe:** Notice the transcriptions appearing for both your speech and the agent's speech. These are `input_transcription` and `output_transcription` events from `run_live()`.
-
-> **Try interrupting:** Start speaking while the agent is responding. The agent stops immediately—this is the `interrupted` flag in action, enabling natural conversation flow.
-
-> **Lifecycle in action:** Audio chunks stream continuously via `send_realtime()`. The Live API uses Voice Activity Detection (VAD) to determine when you've finished speaking—no manual signaling needed.
-
-**Audio Specifications:**
-
-| Direction | Format | Sample Rate | Channels | Chunk Size |
-|-----------|--------|-------------|----------|------------|
-| **Input** (your voice) | 16-bit PCM | 16 kHz | Mono | 50-100ms (1,600-3,200 bytes) |
-| **Output** (model voice) | 16-bit PCM | 24 kHz | Mono | Buffered for smooth playback |
-
-**Model Architectures:**
-
-The demo uses a native audio model by default, but you can switch models in `.env`:
-
-| Feature | Native Audio | Half-Cascade |
-|---------|-------------|--------------|
-| Response modality | AUDIO only | TEXT and AUDIO |
-| Natural prosody | Yes - more human-like | Synthesized |
-| Proactive audio | Yes | No |
-| Affective dialog | Yes | No |
-
-> **Choosing the right model:** For natural conversation with emotional awareness, use native audio (`gemini-2.5-flash-native-audio-preview-12-2025`). For applications needing text output, use half-cascade.
-
-### 3.3 Image/Camera Input
-
-The demo supports image input through the camera:
-
-1. **Click the camera button** to open camera preview
-2. **Allow camera access** when prompted
-3. **Position your subject** and click "Capture"
-4. **Ask about the image**: "What do you see in this image?"
-
-**Try these scenarios:**
-
-- Show a product and ask "What is this?"
-- Show text and ask "Can you read this?"
-- Show a scene and ask "Describe what you see"
-
-> **What to observe:** The captured image appears in the chat, then the agent responds with a description. Images use the same `send_realtime()` method as audio.
-
-> **Lifecycle in action:** Images are sent as JPEG blobs via `send_realtime()`. The model processes them alongside the conversation context and responds with text or audio.
-
-**Image Specifications:**
-
-| Property | Specification |
-|----------|---------------|
-| Format | JPEG |
-| Resolution | 768×768 recommended |
-| Frame rate | 1 FPS maximum |
-
-### 3.4 Tracing a Complete Interaction
-
-Now that you've experienced the demo, let's trace what happens during a typical voice search. Ask the agent: *"What's the weather in Tokyo?"*
-
-```mermaid
-sequenceDiagram
-    participant User as 🎤 User
-    participant Browser as 🌐 Browser
-    participant Server as 🖥️ Server
-    participant API as ☁️ Live API
-    participant Tool as 🔍 Google Search
-
-    Note over User,Browser: 1. Audio Capture → Queue
-    User->>Browser: Speaks "What's the weather in Tokyo?"
-    Browser->>Server: Binary audio chunks (16kHz PCM)
-    Server->>API: send_realtime(audio_blob)
-
-    Note over API: 2. VAD Detection
-    API->>API: Detects speech ended
-
-    Note over API,Server: 3. Transcription Event
-    API->>Server: input_transcription: "What's the weather in Tokyo?"
-    Server->>Browser: JSON event
-
-    Note over API,Tool: 4. Tool Execution
-    API->>Server: Tool call: google_search("weather Tokyo")
-    Server->>Tool: Execute search (automatic)
-    Tool->>Server: Search results
-    Server->>API: Tool response
-
-    Note over API,Browser: 5. Audio Response
-    API->>Server: Audio chunks (24kHz PCM)
-    Server->>Browser: JSON events with inline_data
-    Browser->>User: "The weather in Tokyo is currently 22 degrees..."
-
-    Note over API,Browser: 6. Turn Complete
-    API->>Server: turn_complete: true
-    Server->>Browser: JSON event
-    Browser->>Browser: Hide typing indicator
-```
-
-**What you just observed:**
-
-1. **Audio Capture**: Your microphone captured audio at 16kHz, converted to PCM, and streamed via WebSocket
-2. **VAD Detection**: The Live API detected when you stopped speaking
-3. **Transcription**: Your speech was transcribed and displayed (`input_transcription` event)
-4. **Tool Execution**: The model called Google Search—ADK handled this automatically
-5. **Audio Response**: The model's spoken response streamed back at 24kHz
-6. **Turn Complete**: The `turn_complete` flag signaled the response was finished
-
-> **This entire flow takes under two seconds.** In Section 4, we'll examine the code that makes this possible.
+| Method | Use Case | Triggers Response? |
+|--------|----------|-------------------|
+| `send_content(content)` | Text messages | Yes, immediately |
+| `send_realtime(blob)` | Audio/image streams | After VAD detects silence |
+| `send_activity_start()` | Signal user is active | No |
+| `send_activity_end()` | Signal user stopped | May trigger response |
+| `close()` | End the session | N/A |
 
 ---
 
-## Break (10 min)
+## Step 1: Minimal WebSocket Server (10 min)
 
-Take a short break. When you return, we'll dive into the code!
+Let's start with the simplest possible WebSocket server that echoes messages back.
 
----
+### Activate Step 1
 
-## Section 4: Code Walkthrough (20 min)
+Copy the step 1 source file to `main.py`:
 
-### 4.1 Application Initialization
-
-Open `app/main.py` in the editor and examine the application initialization. This phase runs once when the server starts and creates the shared components that all WebSocket connections will use.
-
-```python
-# bidi-demo/app/main.py:19-53
-
-# IMPORTANT: Load environment variables BEFORE importing agent
-# The agent reads DEMO_AGENT_MODEL at import time
-from dotenv import load_dotenv
-load_dotenv(Path(__file__).parent / ".env")
-
-from google_search_agent.agent import agent  # Now safe to import
-
-# ========================================
-# Phase 1: Application Initialization (once at startup)
-# ========================================
-
-app = FastAPI()  # Web framework for HTTP and WebSocket
-
-# Serve static files (HTML, CSS, JS) for the web UI
-static_dir = Path(__file__).parent / "static"
-app.mount("/static", StaticFiles(directory=static_dir), name="static")
-
-# These are created ONCE and shared across ALL connections
-session_service = InMemorySessionService()  # Stores conversation history
-runner = Runner(app_name=APP_NAME, agent=agent, session_service=session_service)
+```bash
+cd ~/bidi-workshop/app
+cp step1_main.py main.py
 ```
 
-**Understanding each component:**
+Open `main.py` in the editor to examine the code. Key points:
 
-- **`load_dotenv()`**: Loads environment variables from the `.env` file into the process. This must happen before importing the agent because the agent definition reads `DEMO_AGENT_MODEL` at module load time to configure which Gemini model to use.
+- **FastAPI app**: Creates the web server
+- **Static files mount**: Serves the frontend HTML/CSS/JS
+- **WebSocket endpoint**: Accepts connections at `/ws/{user_id}/{session_id}`
+- **Echo response**: Returns the received text in ADK event format
 
-- **`agent`**: The Agent object defines your AI's personality and capabilities. It's imported from a separate module where you configure the model, system instruction, and available tools. The agent is stateless—the same agent instance can serve all users.
+### Test Step 1
 
-- **`FastAPI()`**: Creates the web application that handles HTTP requests and WebSocket connections. FastAPI is chosen for its native async support, which is essential for real-time streaming.
+Start the server:
 
-- **`StaticFiles`**: Serves the frontend assets (HTML, CSS, JavaScript) that make up the web UI. This allows the server to host both the API and the client application.
-
-- **`InMemorySessionService`**: Manages session state and conversation history. Sessions are stored in memory, which is fast but loses data when the server restarts. For production, consider `DatabaseSessionService` for persistent storage.
-
-- **`Runner`**: The orchestrator that manages the streaming lifecycle. It coordinates between your agent, the session service, and the Live API. The runner is thread-safe and can handle multiple concurrent connections.
-
-**Why single instances matter:**
-
-Creating `SessionService` and `Runner` once at startup (rather than per-connection) provides several benefits:
-
-1. **Memory efficiency**: Shared instances use less memory than per-connection instances
-2. **Session persistence**: All connections access the same session store, enabling reconnection
-3. **Thread safety**: Both classes are designed to handle concurrent access safely
-4. **Resource pooling**: The runner can efficiently manage connections to the Live API
-
-### 4.2 Session Initialization
-
-Examine the WebSocket endpoint where sessions are initialized. This phase runs for each new WebSocket connection and sets up the per-session resources needed for bidirectional streaming.
-
-```python
-# bidi-demo/app/main.py:71-163
-
-# WebSocket endpoint - path parameters capture user/session IDs
-@app.websocket("/ws/{user_id}/{session_id}")
-async def websocket_endpoint(
-    websocket: WebSocket,
-    user_id: str,                    # From URL path
-    session_id: str,                 # From URL path
-    proactivity: bool = False,       # From query param ?proactivity=true
-    affective_dialog: bool = False,  # From query param ?affective_dialog=true
-) -> None:
-    await websocket.accept()  # Complete WebSocket handshake
-
-    # ========================================
-    # Phase 2: Session Initialization (runs for EACH connection)
-    # ========================================
-
-    # Auto-detect model type to configure appropriate response modality
-    model_name = agent.model
-    is_native_audio = "native-audio" in model_name.lower()
-
-    if is_native_audio:
-        # Native audio models: respond with speech, enable advanced features
-        run_config = RunConfig(
-            streaming_mode=StreamingMode.BIDI,
-            response_modalities=["AUDIO"],  # Model responds with voice
-            input_audio_transcription=types.AudioTranscriptionConfig(),   # Transcribe user speech
-            output_audio_transcription=types.AudioTranscriptionConfig(),  # Transcribe model speech
-            proactivity=(
-                types.ProactivityConfig(proactive_audio=True) if proactivity else None
-            ),
-            enable_affective_dialog=affective_dialog if affective_dialog else None,
-        )
-    else:
-        # Half-cascade models: respond with text for faster performance
-        run_config = RunConfig(
-            streaming_mode=StreamingMode.BIDI,
-            response_modalities=["TEXT"],  # Model responds with text
-        )
-
-    # Restore existing session or create new one
-    session = await session_service.get_session(
-        app_name=APP_NAME, user_id=user_id, session_id=session_id
-    )
-    if not session:
-        await session_service.create_session(
-            app_name=APP_NAME, user_id=user_id, session_id=session_id
-        )
-
-    # Create fresh queue for this connection's upstream messages
-    live_request_queue = LiveRequestQueue()
+```bash
+cd ~/bidi-workshop/app
+python -m uvicorn main:app --reload --host 0.0.0.0 --port 8080
 ```
 
-**Understanding the WebSocket endpoint:**
+Open Web Preview (globe icon → Preview on port 8080).
 
-- **Path parameters (`user_id`, `session_id`)**: Extracted from the URL path (e.g., `/ws/user123/session456`). These identifiers enable session persistence—if a user reconnects with the same IDs, they resume their existing conversation.
+**Test it:**
+1. Type "Hello" in the text input
+2. Click Send
+3. You should see "Echo: {"type": "text", "text": "Hello"}" in the chat
 
-- **Query parameters (`proactivity`, `affective_dialog`)**: Optional boolean flags passed as URL query strings (e.g., `?proactivity=true`). These enable advanced features only available on native audio models.
+> **What you built**: A WebSocket server that receives messages and sends responses. The frontend displays it as a chat message because the response follows ADK's event format.
 
-- **`websocket.accept()`**: Completes the WebSocket handshake. The connection upgrades from HTTP to WebSocket protocol, enabling full-duplex communication.
+### Client Code: WebSocket Connection
 
-**Understanding RunConfig:**
+The frontend establishes and manages the WebSocket connection. Here's what happens on the client side:
 
-The `RunConfig` object controls how the streaming session behaves. Different model architectures require different configurations:
-
-| Setting | Native Audio | Half-Cascade |
-|---------|--------------|--------------|
-| `response_modalities` | `["AUDIO"]` (required) | `["TEXT"]` (faster) |
-| `input_audio_transcription` | Enabled | Not needed |
-| `output_audio_transcription` | Enabled | Not needed |
-| `proactivity` | Optional | Not supported |
-| `affective_dialog` | Optional | Not supported |
-
-**Understanding session management:**
-
-- **`get_session()`**: Attempts to retrieve an existing session. Returns `None` if no session exists for this user/session ID combination.
-
-- **`create_session()`**: Creates a new session if none exists. The session stores conversation history, enabling context continuity.
-
-- **Session keys**: The combination of `app_name`, `user_id`, and `session_id` uniquely identifies a session. This allows multiple sessions per user and multiple users per application.
-
-**Understanding LiveRequestQueue:**
-
-A new `LiveRequestQueue` is created for each connection. This queue is the communication channel between your upstream task and the Live API. Key characteristics:
-
-1. **Per-connection**: Each WebSocket connection gets its own queue (unlike SessionService, which is shared)
-2. **Thread-safe**: Can receive messages from async tasks concurrently
-3. **Buffered**: Handles timing differences between client and server
-4. **Must be closed**: Always close the queue when the connection ends to release resources
-
-### 4.3 Upstream Task
-
-The upstream task handles all incoming messages from the client, running as a continuous loop that bridges the WebSocket connection to the LiveRequestQueue. This task is one half of the concurrent pair that enables bidirectional streaming.
-
-```python
-# bidi-demo/app/main.py:169-217
-async def upstream_task() -> None:
-    """Receives messages from WebSocket and sends to LiveRequestQueue."""
-    while True:  # Runs continuously until connection closes
-        message = await websocket.receive()  # Wait for next WebSocket frame
-
-        # Binary frames = raw audio bytes (most efficient for streaming)
-        if "bytes" in message:
-            audio_data = message["bytes"]
-            audio_blob = types.Blob(
-                mime_type="audio/pcm;rate=16000",  # 16kHz mono PCM required
-                data=audio_data
-            )
-            live_request_queue.send_realtime(audio_blob)  # Stream to model
-
-        # Text frames = JSON messages (text input, images, etc.)
-        elif "text" in message:
-            json_message = json.loads(message["text"])
-
-            # User typed a message
-            if json_message.get("type") == "text":
-                content = types.Content(
-                    parts=[types.Part(text=json_message["text"])]
-                )
-                live_request_queue.send_content(content)  # Triggers model response
-
-            # User captured an image
-            elif json_message.get("type") == "image":
-                image_data = base64.b64decode(json_message["data"])
-                image_blob = types.Blob(
-                    mime_type=json_message.get("mimeType", "image/jpeg"),
-                    data=image_data
-                )
-                live_request_queue.send_realtime(image_blob)  # Send for analysis
-```
-
-**Understanding the upstream loop:**
-
-- **`while True` loop**: The task runs indefinitely until the WebSocket disconnects (which raises an exception caught by the outer `try/except`). This design keeps the task alive to receive messages at any time.
-
-- **`await websocket.receive()`**: This is an async operation that yields control to other tasks while waiting for the next WebSocket frame. When a frame arrives, it returns a dictionary containing either `"bytes"` (for binary frames) or `"text"` (for text frames).
-
-- **Frame type detection**: WebSocket supports two payload types—binary and text. The code checks which key exists in the message dictionary to determine the frame type.
-
-**Understanding ADK types:**
-
-- **`types.Blob`**: Represents binary data with a MIME type. Used for audio, images, and video. The MIME type (e.g., `audio/pcm;rate=16000`) tells the Live API how to interpret the bytes.
-
-- **`types.Content`**: Represents structured content with one or more parts. Used for text messages. The `parts` list can contain multiple `Part` objects for multipart content.
-
-- **`types.Part`**: A single piece of content, which can be text (`text=...`), binary data (`inline_data=...`), or a file reference (`file_data=...`).
-
-**Understanding send methods:**
-
-| Method | Data Type | Behavior | Use Case |
-|--------|-----------|----------|----------|
-| `send_content()` | `types.Content` | Signals end of turn, triggers response | User sends a text message |
-| `send_realtime()` | `types.Blob` | Continuous streaming, no turn signal | Audio chunks, video frames, images |
-
-The key difference: `send_content()` tells the model "the user is done speaking, please respond," while `send_realtime()` says "here's more data, keep listening."
-
-**Why MIME types matter:**
-
-The MIME type string contains critical information for the Live API:
-
-- `audio/pcm;rate=16000`: Raw PCM audio at 16kHz sample rate (required format for input)
-- `image/jpeg`: JPEG-compressed image
-- `image/png`: PNG image with transparency support
-
-Incorrect MIME types will cause the Live API to misinterpret the data, leading to errors or garbled output.
-
-#### Understanding LiveRequestQueue
-
-The path from your application to the AI flows through a single interface: LiveRequestQueue. Instead of juggling different APIs for text, audio, and control signals, you use one elegant queue that handles everything.
-
-![ADK Bidi-Streaming: Upstream Flow with LiveRequestQueue](assets/live_req_queue.png)
-
-| Method | Use Case | Example |
-|--------|----------|---------|
-| `send_content(content)` | Text messages (turn-based) | User typed a message |
-| `send_realtime(blob)` | Audio/image/video (streaming) | Microphone audio chunk |
-| `send_activity_start()` / `send_activity_end()` | Manual turn control | Push-to-talk interfaces |
-| `close()` | End the session | User disconnected |
-
-> **Pro tip:** Don't wait for model responses before sending the next audio chunk. The queue handles buffering, and the model expects continuous streaming. Waiting creates awkward pauses in conversation.
-
-#### Client-Side: Sending Text Messages
-
-The client sends text messages as JSON through the WebSocket. Unlike audio which streams continuously as binary data, text messages are discrete events sent when the user explicitly submits a message.
-
-**JavaScript (app.js):**
-
-The `sendMessage()` function packages text into a JSON object and sends it as a WebSocket text frame. The server parses this JSON to extract the message content.
+**Connecting to the server (app.js:10-12, 317-350):**
 
 ```javascript
-// bidi-demo/app/static/js/app.js:755-766
+// app.js:10-12 - Session identifiers
+const userId = "demo-user";
+const sessionId = "demo-session-" + Math.random().toString(36).substring(7);
+
+// app.js:317-350 - WebSocket connection
+function connectWebsocket() {
+    // Construct WebSocket URL with user/session IDs
+    const ws_url = "ws://" + window.location.host + "/ws/" + userId + "/" + sessionId;
+    websocket = new WebSocket(ws_url);
+
+    websocket.onopen = function() {
+        console.log("WebSocket connected");
+        updateConnectionStatus(true);  // Update UI indicator
+    };
+
+    websocket.onclose = function() {
+        console.log("WebSocket closed");
+        updateConnectionStatus(false);
+        setTimeout(connectWebsocket, 5000);  // Auto-reconnect
+    };
+
+    websocket.onmessage = function(event) {
+        // Handle incoming messages (we'll explore this later)
+        const data = JSON.parse(event.data);
+        // ... process event
+    };
+}
+
+// Connect when page loads
+connectWebsocket();
+```
+
+**Key concepts:**
+
+| Concept | Purpose |
+|---------|---------|
+| `userId` / `sessionId` | Identify user and conversation for session persistence |
+| `WebSocket()` | Browser API for real-time bidirectional communication |
+| `onopen` / `onclose` | Connection lifecycle callbacks |
+| `onmessage` | Receives all server events (text, audio, transcriptions) |
+| Auto-reconnect | Handles network interruptions gracefully |
+
+**Why WebSocket?** Unlike HTTP which is request-response, WebSocket maintains a persistent connection allowing the server to push events to the client at any time—essential for streaming AI responses.
+
+**Checkpoint**: You have a working WebSocket connection!
+
+---
+
+## Step 2: Add the Agent (10 min)
+
+Now let's add an actual AI agent to generate real responses.
+
+### Examine the Agent
+
+The agent files were downloaded during setup. Open `my_agent/agent.py` in the editor to examine the code.
+
+### Understand the Agent
+
+```python
+agent = Agent(
+    name="workshop_agent",        # Identifier for logs and debugging
+    model=os.getenv(...),         # Which Gemini model to use
+    instruction="...",            # System prompt - shapes personality
+    tools=[google_search],        # Tools the agent can call
+)
+```
+
+The Agent is **stateless**—it defines behavior, not conversation state. The same agent instance serves all users.
+
+### Client Code: No Changes Needed
+
+The Agent is purely server-side—the client doesn't know or care about agent configuration. From the client's perspective:
+
+```
+Client sends: {"type": "text", "text": "Hello"}
+Client receives: {"content": {"parts": [{"text": "..."}]}, ...}
+```
+
+The client only deals with:
+- **Sending messages** (text, audio, images)
+- **Receiving events** (responses, transcriptions, tool calls)
+
+The Agent's instruction, model selection, and tools are invisible to the frontend. This separation means you can change agent behavior without modifying client code.
+
+### Test Step 2
+
+The `--reload` flag auto-detects file changes. Check the terminal—you should see uvicorn reload the app automatically.
+
+If you see import errors, verify `my_agent/__init__.py` exists and is empty.
+
+**Checkpoint**: Agent defined, but not yet connected to WebSocket.
+
+---
+
+## Step 3: Application Initialization (10 min)
+
+ADK requires three components initialized once at startup:
+
+1. **Agent** - Defines AI behavior (already created)
+2. **SessionService** - Stores conversation history
+3. **Runner** - Orchestrates streaming
+
+### Activate Step 3
+
+Copy the step 3 source file to `main.py`:
+
+```bash
+cp step3_main.py main.py
+```
+
+Open `main.py` in the editor to examine the new code. Key additions:
+
+- **Load environment**: `load_dotenv()` loads `.env` before importing agent
+- **SessionService**: `InMemorySessionService()` stores conversation history
+- **Runner**: Orchestrates agent execution with session management
+
+### Test Step 3
+
+After the server reloads, send a message. You should see "ADK Ready! Model: gemini-live-2.5-flash-native-audio" in the chat.
+
+**Checkpoint**: ADK components initialized! The app is not ready for actual chat yet - we'll connect to the Live API in the next steps.
+
+### Understand the Components
+
+```python
+# SessionService: Stores conversation history
+session_service = InMemorySessionService()  # Memory-based (lost on restart)
+# For production: DatabaseSessionService or VertexAiSessionService
+
+# Runner: Orchestrates everything
+runner = Runner(
+    app_name=APP_NAME,           # Identifies your application
+    agent=agent,                  # The agent to run
+    session_service=session_service,  # Where to store sessions
+)
+```
+
+**Why single instances?**
+- Created once at startup, shared across all connections
+- Thread-safe and memory-efficient
+- SessionService enables conversation continuity across reconnections
+
+### Client Code: Session ID Generation
+
+While `SessionService` and `Runner` are server-side, the client controls session identity:
+
+```javascript
+// app.js - Session ID generation
+const userId = "demo-user";  // In production: authenticated user ID
+const sessionId = "demo-session-" + Math.random().toString(36).substring(7);
+
+// URL includes these IDs
+const ws_url = "ws://" + window.location.host + "/ws/" + userId + "/" + sessionId;
+```
+
+---
+
+## Step 4: Session Initialization (15 min)
+
+Each WebSocket connection needs its own session. This is Phase 2 of the lifecycle.
+
+### Activate Step 4
+
+Copy the step 4 source file to `main.py`:
+
+```bash
+cp step4_main.py main.py
+```
+
+Open `main.py` in the editor to examine the new code. Key additions:
+
+- **RunConfig**: Configures streaming mode, response modalities, and transcription
+- **Session management**: Gets or creates session for conversation history
+- **LiveRequestQueue**: Creates the queue for sending input to the model
+- **Termination**: Closes the queue in `finally` block
+
+### Test Step 4
+
+Restart and test. Open a second browser tab with the same URL.
+
+**Checkpoint**: Per-session resources created!
+
+### Understand RunConfig
+
+```python
+run_config = RunConfig(
+    streaming_mode=StreamingMode.BIDI,  # WebSocket bidirectional
+    response_modalities=["AUDIO"],       # Native audio models require AUDIO
+    input_audio_transcription=types.AudioTranscriptionConfig(),
+    output_audio_transcription=types.AudioTranscriptionConfig(),
+)
+```
+
+**Key RunConfig options:**
+
+| Parameter | Purpose |
+|-----------|---------|
+| `streaming_mode` | `BIDI` for WebSocket, `SSE` for HTTP |
+| `response_modalities` | `["AUDIO"]` for native audio models |
+| `input_audio_transcription` | Transcribe user speech to text |
+| `output_audio_transcription` | Transcribe model audio to text |
+
+![RunConfig Configuration Options](assets/runconfig.png)
+
+**Additional RunConfig options for production:**
+
+| Parameter | Purpose |
+|-----------|---------|
+| `speech_config` | Configure voice selection and speaking style |
+| `proactivity` | Enable model-initiated responses (native audio only) |
+| `session_resumption` | Enable automatic reconnection after WebSocket timeouts |
+| `context_window_compression` | Remove session duration limits |
+
+**Understanding Session Types:**
+
+One concept trips up many developers: ADK Session vs Live API session.
+
+- **ADK Session**: Persistent, lives in SessionService, survives restarts. User returns days later with history intact.
+- **Live API session**: Ephemeral, exists only during active `run_live()`. When the loop ends, it's destroyed—but ADK has already persisted the events.
+
+### Understand LiveRequestQueue
+
+```python
+live_request_queue = LiveRequestQueue()
+```
+
+This is the **upstream channel** for sending input to the model:
+
+| Method | Use Case |
+|--------|----------|
+| `send_content(content)` | Text messages (triggers response) |
+| `send_realtime(blob)` | Audio/image chunks (streaming) |
+| `close()` | End the session |
+
+---
+
+## Step 5: Upstream Task (15 min)
+
+Now we'll send text to the model using `LiveRequestQueue`.
+
+### Activate Step 5
+
+Copy the step 5 source file to `main.py`:
+
+```bash
+cp step5_main.py main.py
+```
+
+Open `main.py` in the editor to examine the new code. Key additions:
+
+- **upstream_task()**: Async function that receives WebSocket messages
+- **JSON parsing**: Extracts text from `{"type": "text", "text": "..."}` messages
+- **types.Content**: Creates ADK Content object with text part
+- **send_content()**: Sends text to the model (triggers immediate response)
+- **asyncio.gather()**: Runs upstream and downstream tasks concurrently
+
+### Test Step 5
+
+Restart and send a message. Check the terminal—you should see:
+```
+User said: Hello
+Sent to LiveRequestQueue
+```
+
+The message goes to the model, but we're not receiving responses yet. That's next!
+
+**Checkpoint**: Upstream path working!
+
+### Understand the Upstream Flow
+
+```python
+# Parse JSON message from client
+json_message = json.loads(text_data)
+# {"type": "text", "text": "Hello"}
+
+# Create ADK Content object
+content = types.Content(
+    parts=[types.Part(text=user_text)]
+)
+
+# Send to model via queue
+live_request_queue.send_content(content)
+```
+
+**Content vs Blob:**
+- `types.Content` - Structured text (triggers model response)
+- `types.Blob` - Binary data like audio/images (streams continuously)
+
+### Client Code: Sending Text Messages
+
+The client sends text as JSON through the WebSocket:
+
+```javascript
+// app.js:755-766 - Send text message
 function sendMessage(message) {
-    // Only send if connection is open
     if (websocket && websocket.readyState === WebSocket.OPEN) {
-        // Package as JSON with type identifier
         const jsonMessage = JSON.stringify({
-            type: "text",  // Server uses this to route the message
+            type: "text",      // Server uses this to route the message
             text: message
         });
-        websocket.send(jsonMessage);  // Send as text frame
+        websocket.send(jsonMessage);  // Sends as text frame
     }
 }
-```
 
-**Understanding the message structure:**
-
-- **`type: "text"`**: This field acts as a discriminator that tells the server how to process the message. The server's `upstream_task()` uses this to determine whether to call `send_content()` (for text) or `send_realtime()` (for images).
-
-- **`text`**: The actual message content typed by the user.
-
-- **`JSON.stringify()`**: Converts the JavaScript object to a JSON string for transmission over WebSocket.
-
-- **`websocket.send()`**: When passed a string, WebSocket sends it as a text frame (not binary).
-
-**Form submission handler:**
-
-The form submission handler demonstrates the "optimistic update" pattern, where the UI updates immediately before the server confirms receipt:
-
-```javascript
-// bidi-demo/app/static/js/app.js:734-752
+// app.js:734-752 - Form submission handler
 messageForm.onsubmit = function(e) {
-    e.preventDefault();  // Don't reload the page
+    e.preventDefault();  // Don't reload page
     const message = messageInput.value.trim();
+
     if (message) {
-        // Show user's message in the UI immediately (optimistic update)
+        // Optimistic UI update - show message immediately
         const userBubble = createMessageBubble(message, true);
         messagesDiv.appendChild(userBubble);
 
-        messageInput.value = "";  // Clear input field
-        sendMessage(message);     // Send to server
+        messageInput.value = "";  // Clear input
+        sendMessage(message);      // Send to server
     }
 };
 ```
 
-**Understanding the optimistic update pattern:**
+**Key patterns:**
 
-1. **`e.preventDefault()`**: Prevents the default form submission behavior (page reload). This is essential for single-page applications.
+| Pattern | Purpose |
+|---------|---------|
+| `JSON.stringify()` | Package text with type identifier |
+| `websocket.send(string)` | Send as WebSocket text frame |
+| `e.preventDefault()` | Stop form from reloading page |
+| Optimistic update | Show user message before server confirms |
 
-2. **`message.trim()`**: Removes leading/trailing whitespace. Empty messages are ignored.
+**Message flow:**
 
-3. **Immediate UI update**: The `createMessageBubble()` creates a chat bubble and appends it to the chat area before sending to the server. This provides instant visual feedback to the user.
+```
+User types → Form submit → JSON.stringify → WebSocket text frame
+    → Server receives → json.loads() → types.Content
+    → live_request_queue.send_content()
+```
 
-4. **Clear input**: The input field is cleared immediately so the user can start typing their next message.
+The `type: "text"` field tells the server this is a text message (vs image or other types we'll add later).
 
-5. **Async send**: `sendMessage()` sends the message to the server. The response will arrive later via the `websocket.onmessage` handler.
+---
 
-**Why optimistic updates matter:**
+## Step 6: Downstream Task (15 min)
 
-In real-time applications, waiting for server confirmation before showing the user's message creates a perceptible delay that feels sluggish. By showing the message immediately, the UI feels responsive even if the server takes time to process the request. If the send fails, you can handle it by showing an error indicator on the message bubble.
+Now the exciting part—receiving streaming responses from the model!
 
-#### Client-Side: Sending Audio
+### Activate Step 6
 
-Audio capture uses Web Audio API with AudioWorklet for real-time processing. The AudioWorklet API provides low-latency audio processing by running on a dedicated audio rendering thread, separate from the main JavaScript thread. This architecture is essential for real-time audio applications because it prevents audio glitches that would occur if the main thread was blocked by other JavaScript execution.
+Copy the step 6 source file to `main.py`:
 
-**JavaScript (audio-recorder.js):**
+```bash
+cp step6_main.py main.py
+```
 
-The `startAudioRecorderWorklet()` function sets up the complete audio capture pipeline. It creates an AudioContext configured for 16kHz sample rate (matching the Live API's required input format), loads an AudioWorklet processor module, obtains microphone access, and connects all the audio nodes together.
+Open `main.py` in the editor to examine the new code. Key additions:
+
+- **runner.run_live()**: Async generator that yields events from the model
+- **Event serialization**: `event.model_dump_json()` converts events to JSON
+- **WebSocket forwarding**: Sends each event to the client immediately
+- **Error handling**: Catches exceptions and ensures queue is closed
+
+### Test Step 6
+
+Restart and try:
+
+1. Type "Hello, who are you?"
+2. Watch the response stream in word by word!
+3. Try "Search for the weather in Tokyo"—watch tool execution!
+
+Open the Event Console (right panel) to see raw events.
+
+**Checkpoint**: Full bidirectional text streaming!
+
+### Understand run_live()
+
+```python
+async for event in runner.run_live(
+    user_id=user_id,              # Identifies the user
+    session_id=session_id,        # Identifies the session
+    live_request_queue=live_request_queue,  # Input channel
+    run_config=run_config,        # Streaming configuration
+):
+    # Events arrive as they're generated - true streaming!
+    event_json = event.model_dump_json(exclude_none=True, by_alias=True)
+    await websocket.send_text(event_json)
+```
+
+**run_live() is an async generator** that yields events in real-time:
+
+| Event Type | Field | Description |
+|------------|-------|-------------|
+| Text content | `event.content.parts[0].text` | Model's text response |
+| Audio content | `event.content.parts[0].inline_data` | Model's audio response |
+| Turn complete | `event.turn_complete` | Model finished responding |
+| Interrupted | `event.interrupted` | User interrupted model |
+
+![Comprehensive Summary of ADK Live Event Handling](assets/run_live.png)
+
+### The Event Console
+
+The demo application includes an Event Console (right panel) that displays raw events as they arrive. This is invaluable for debugging and understanding the streaming flow.
+
+| Icon | Event Type | Description |
+|------|------------|-------------|
+| 📝 | Text content | Model's text response chunks |
+| 🔊 | Audio content | Model's audio response chunks |
+| 🎤 | Input transcription | User's speech converted to text |
+| 📜 | Output transcription | Model's audio converted to text |
+| 🛠️ | Tool call | Model requesting to use a tool |
+| ✅ | Tool response | Result from tool execution |
+| ⏹️ | Turn complete | Model finished responding |
+| ⚡ | Interrupted | User interrupted the model |
+
+Watch the Event Console as you interact—you'll see exactly how events flow in a streaming conversation.
+
+### Client Code: Receiving and Processing Events
+
+The client handles all incoming events in `websocket.onmessage`:
 
 ```javascript
-// bidi-demo/app/static/js/audio-recorder.js:7-38
-// Start audio recording worklet
+// app.js:341-693 - Event handler (simplified)
+websocket.onmessage = function(event) {
+    const adkEvent = JSON.parse(event.data);
+
+    // Log to Event Console
+    addEventToConsole(adkEvent);
+
+    // Handle turn complete - model finished responding
+    if (adkEvent.turnComplete === true) {
+        currentMessageId = null;
+        currentBubbleElement = null;
+        return;
+    }
+
+    // Handle interrupted - user started speaking while model was responding
+    if (adkEvent.interrupted === true) {
+        if (audioPlayerNode) {
+            audioPlayerNode.port.postMessage({ command: "endOfAudio" });
+        }
+        if (currentBubbleElement) {
+            currentBubbleElement.classList.add("interrupted");
+        }
+        return;
+    }
+
+    // Handle text content - streaming response
+    if (adkEvent.content && adkEvent.content.parts) {
+        for (const part of adkEvent.content.parts) {
+            if (part.text) {
+                if (currentMessageId == null) {
+                    // Create new message bubble
+                    currentMessageId = Date.now();
+                    currentBubbleElement = createMessageBubble(part.text, false, true);
+                    messagesDiv.appendChild(currentBubbleElement);
+                } else {
+                    // Append to existing bubble (streaming effect)
+                    const textSpan = currentBubbleElement.querySelector(".bubble-text");
+                    textSpan.textContent += part.text;
+                }
+            }
+        }
+    }
+};
+```
+
+**Key event handling patterns:**
+
+| Event | Client Action |
+|-------|---------------|
+| `turnComplete: true` | Reset state, ready for next input |
+| `interrupted: true` | Stop audio playback, mark message interrupted |
+| `content.parts[].text` | Append to chat bubble (streaming) |
+| `content.parts[].inline_data` | Send to audio player (we'll add this later) |
+
+**Streaming text effect:**
+
+```
+Event 1: {"content": {"parts": [{"text": "Hello"}]}}    → "Hello"
+Event 2: {"content": {"parts": [{"text": ", how"}]}}    → "Hello, how"
+Event 3: {"content": {"parts": [{"text": " are you?"}]}} → "Hello, how are you?"
+Event 4: {"turnComplete": true}                          → Done!
+```
+
+Each event appends text to the same bubble, creating the "typing" effect.
+
+### Example: Complete Voice Search Flow
+
+Let's trace a complete interaction to see how all the pieces work together. A user asks: *"What's the weather in Tokyo?"*
+
+```
+1. Audio Capture → Queue
+   Browser captures microphone at 16kHz, converts to PCM chunks.
+   Server receives binary frames and calls:
+   live_request_queue.send_realtime(audio_blob)
+
+2. VAD Detection
+   Live API's Voice Activity Detection notices user stopped speaking.
+   Triggers processing of accumulated audio.
+
+3. Transcription Event
+   Event arrives: input_transcription.text = "What's the weather in Tokyo?"
+   Display in chat UI so users see their words recognized.
+
+4. Tool Execution
+   Model decides to call google_search tool.
+   Tool call event arrives → ADK executes automatically → Tool response event follows.
+
+5. Audio Response
+   Model generates spoken response.
+   Audio chunks arrive as events with inline_data.
+   Client feeds them to AudioWorklet for playback:
+   "The weather in Tokyo is currently 22 degrees and sunny."
+
+6. Turn Complete
+   Event arrives with turn_complete=True.
+   UI removes "..." indicator—agent finished talking.
+```
+
+This entire flow takes under two seconds. The user experiences natural conversation, unaware of the LiveRequestQueue, Events, and session management happening beneath the surface.
+
+---
+
+## Step 7: Add Audio (15 min)
+
+Let's add bidirectional voice support—both speaking to the AI and hearing its responses.
+
+### Activate Step 7
+
+Copy the step 7 source file to `main.py`:
+
+```bash
+cp step7_main.py main.py
+```
+
+Open `main.py` in the editor to examine the new code. Key additions:
+
+- **Binary message handling**: Detects `"bytes"` in WebSocket message
+- **types.Blob**: Creates audio blob with `audio/pcm;rate=16000` MIME type
+- **send_realtime()**: Streams audio continuously (VAD triggers response)
+- **Warning filters**: Suppresses noisy authentication warnings
+
+### Test Step 7
+
+After the server reloads:
+
+1. Click "Start Audio" button
+2. Allow microphone access
+3. Speak "Hello, can you hear me?"
+4. Wait for the response—you should hear the AI speak back!
+
+You should see your speech transcribed in the chat (if using a model with transcription support), and hear the AI's audio response through your speakers.
+
+**Checkpoint**: Bidirectional voice streaming working!
+
+### Multimodal Capabilities
+
+ADK Bidi-streaming supports audio, images, and video through the same streaming interface.
+
+![Comprehensive Summary of ADK Live API Multimodal Capabilities](assets/multimodal.png)
+
+### Understand Audio Format
+
+The Live API has specific requirements for audio input and output:
+
+**Input Audio (microphone → model):**
+
+| Property | Value |
+|----------|-------|
+| Format | 16-bit signed PCM |
+| Sample rate | 16 kHz |
+| Channels | Mono |
+| MIME type | `audio/pcm;rate=16000` |
+| Chunk size | 50-100ms recommended (1,600-3,200 bytes) |
+
+**Output Audio (model → speakers):**
+
+| Property | Value |
+|----------|-------|
+| Format | 16-bit signed PCM |
+| Sample rate | 24 kHz |
+| Channels | Mono |
+| Delivery | Streamed as `inline_data` in events |
+
+The frontend's AudioWorklet handles format conversion automatically. The browser captures at 16kHz for input, and the player expects 24kHz for output.
+
+### send_content() vs send_realtime()
+
+```python
+# Text: triggers immediate model response
+live_request_queue.send_content(content)
+
+# Audio: streams continuously, model uses VAD to detect turn end
+live_request_queue.send_realtime(audio_blob)
+```
+
+**VAD (Voice Activity Detection)**: The Live API automatically detects when you stop speaking and triggers a response—no manual "end of turn" signal needed.
+
+### Client Code: Audio Capture with AudioWorklet
+
+The frontend captures microphone audio using the Web Audio API with AudioWorklet for low-latency processing:
+
+**Setting up the audio pipeline (audio-recorder.js:7-38):**
+
+```javascript
+// audio-recorder.js:7-38 - Start audio recording
 export async function startAudioRecorderWorklet(audioRecorderHandler) {
     // Create AudioContext at 16kHz (required by Live API)
     const audioRecorderContext = new AudioContext({ sampleRate: 16000 });
 
-    // Load the AudioWorklet processor module
+    // Load the AudioWorklet processor
     const workletURL = new URL("./pcm-recorder-processor.js", import.meta.url);
     await audioRecorderContext.audioWorklet.addModule(workletURL);
 
@@ -819,7 +1032,7 @@ export async function startAudioRecorderWorklet(audioRecorderHandler) {
     });
     const source = audioRecorderContext.createMediaStreamSource(micStream);
 
-    // Create and connect the AudioWorklet node
+    // Create and connect the processor node
     const audioRecorderNode = new AudioWorkletNode(
         audioRecorderContext,
         "pcm-recorder-processor"
@@ -828,168 +1041,284 @@ export async function startAudioRecorderWorklet(audioRecorderHandler) {
 
     // Handle audio data from the worklet
     audioRecorderNode.port.onmessage = (event) => {
-        // Convert Float32 to 16-bit PCM
         const pcmData = convertFloat32ToPCM(event.data);
-        audioRecorderHandler(pcmData);
+        audioRecorderHandler(pcmData);  // Send to WebSocket
     };
 
     return [audioRecorderNode, audioRecorderContext, micStream];
 }
-```
 
-**Key steps in the audio pipeline:**
-
-1. **AudioContext creation**: The `sampleRate: 16000` configuration tells the browser to resample microphone audio to 16kHz, which is the exact format the Live API expects for input audio.
-
-2. **AudioWorklet module loading**: The `addModule()` method loads the processor script (`pcm-recorder-processor.js`) into the audio worklet global scope. This must complete before creating AudioWorkletNode instances.
-
-3. **Microphone access**: `getUserMedia()` requests permission and returns a MediaStream. The `channelCount: 1` constraint ensures mono audio, reducing bandwidth by half compared to stereo.
-
-4. **Audio node graph**: The `source.connect(audioRecorderNode)` call creates the processing pipeline: microphone → MediaStreamSource → AudioWorkletNode. Audio flows through this graph automatically.
-
-5. **Message port communication**: AudioWorklets run on a separate thread and communicate with the main thread via `postMessage()`. The `onmessage` handler receives audio chunks and converts them to PCM format.
-
-**Audio format conversion:**
-
-The Web Audio API internally uses 32-bit floating-point samples normalized to the range [-1.0, 1.0]. However, the Live API requires 16-bit signed PCM integers in the range [-32768, 32767]. The `convertFloat32ToPCM()` function performs this essential format conversion.
-
-```javascript
-// bidi-demo/app/static/js/audio-recorder.js:49-58
-// Convert Float32 samples to 16-bit PCM
+// audio-recorder.js:49-58 - Convert Float32 samples to 16-bit PCM
 function convertFloat32ToPCM(inputData) {
     const pcm16 = new Int16Array(inputData.length);
     for (let i = 0; i < inputData.length; i++) {
-        // Scale float [-1, 1] to int16 [-32768, 32767]
-        pcm16[i] = inputData[i] * 0x7fff;
+        pcm16[i] = inputData[i] * 0x7fff;  // Scale [-1,1] to [-32768,32767]
     }
     return pcm16.buffer;
 }
 ```
 
-**Understanding the conversion:**
-
-- **Float32 range**: Web Audio samples are floating-point values between -1.0 (maximum negative amplitude) and 1.0 (maximum positive amplitude), with 0.0 being silence.
-
-- **Int16 range**: PCM audio uses 16-bit signed integers ranging from -32768 (`-0x8000`) to 32767 (`0x7fff`).
-
-- **Scaling factor**: Multiplying by `0x7fff` (32767) maps the float range to the integer range. For example, a float value of 0.5 becomes approximately 16383.
-
-- **ArrayBuffer return**: The function returns `pcm16.buffer` (the underlying ArrayBuffer) rather than the Int16Array, making it suitable for WebSocket binary transmission.
-
-**JavaScript (pcm-recorder-processor.js):**
-
-The AudioWorklet processor runs on the audio rendering thread, completely isolated from the main JavaScript thread. This file defines a custom processor class that captures audio samples and sends them to the main thread for further processing. AudioWorklet processors must extend `AudioWorkletProcessor` and implement the `process()` method.
+**The AudioWorklet processor (pcm-recorder-processor.js:1-18):**
 
 ```javascript
-// bidi-demo/app/static/js/pcm-recorder-processor.js:1-18
-// AudioWorklet processor for capturing microphone audio
+// pcm-recorder-processor.js:1-18
 class PCMProcessor extends AudioWorkletProcessor {
     process(inputs, outputs, parameters) {
         if (inputs.length > 0 && inputs[0].length > 0) {
-            // Copy the first channel (mono)
             const inputChannel = inputs[0][0];
             const inputCopy = new Float32Array(inputChannel);
-            // Send to main thread
-            this.port.postMessage(inputCopy);
+            this.port.postMessage(inputCopy);  // Send to main thread
         }
-        return true; // Keep processor alive
+        return true;  // Keep processor alive
     }
 }
 
 registerProcessor("pcm-recorder-processor", PCMProcessor);
 ```
 
-**How the AudioWorklet processor works:**
-
-- **`process()` method**: Called automatically by the audio system for each render quantum (typically 128 samples at a time). This happens approximately 125 times per second at 16kHz sample rate.
-
-- **Input structure**: The `inputs` parameter is a 3D array: `inputs[inputIndex][channelIndex][sampleIndex]`. For mono microphone input, we access `inputs[0][0]` to get the first channel of the first input.
-
-- **Data copying**: We create a copy of the input data (`new Float32Array(inputChannel)`) because the original buffer is reused by the audio system and would be overwritten before the main thread processes it.
-
-- **MessagePort communication**: `this.port.postMessage()` sends the audio data to the main thread via a MessageChannel. This is the only way to communicate between the audio thread and main thread.
-
-- **Return value**: Returning `true` keeps the processor alive. Returning `false` would disconnect the node and stop processing.
-
-- **`registerProcessor()`**: This global function registers the processor class with a name that can be referenced when creating `AudioWorkletNode` instances in the main thread.
-
-**JavaScript (app.js) - Sending audio chunks:**
-
-The `audioRecorderHandler()` function is the callback that receives converted PCM audio data and sends it to the server. This function is called approximately 125 times per second (once per render quantum) while audio recording is active.
+**Sending audio chunks (app.js:979-988):**
 
 ```javascript
-// bidi-demo/app/static/js/app.js:979-988
-// Audio recorder handler - called for each audio chunk
+// app.js:979-988
 function audioRecorderHandler(pcmData) {
     if (websocket && websocket.readyState === WebSocket.OPEN && is_audio) {
-        // Send audio as binary WebSocket frame (more efficient than base64)
-        websocket.send(pcmData);
+        websocket.send(pcmData);  // Send as binary WebSocket frame
     }
 }
 ```
 
-**Key aspects of audio transmission:**
-
-- **Connection check**: The function verifies the WebSocket is connected (`readyState === WebSocket.OPEN`) before attempting to send. This prevents errors if the connection was closed while audio was still being captured.
-
-- **Audio mode check**: The `is_audio` flag ensures audio is only sent when the user has enabled audio input mode, preventing accidental audio transmission.
-
-- **Binary WebSocket frames**: The `websocket.send(pcmData)` call sends the ArrayBuffer as a binary frame, not a text frame. Binary transmission is more efficient than base64-encoding the audio data, reducing bandwidth by approximately 33%.
-
-- **No buffering**: Audio chunks are sent immediately as they are captured, providing the lowest possible latency. The Live API handles reassembly and processing on the server side.
-
-**Complete audio data flow:**
+**Audio pipeline flow:**
 
 ```
-Microphone → MediaStream → AudioContext (16kHz) → AudioWorkletNode
-    → PCMProcessor (audio thread) → postMessage → Main thread
-    → convertFloat32ToPCM → audioRecorderHandler → WebSocket (binary)
-    → Server → LiveRequestQueue.send_realtime() → Live API
+Microphone → MediaStream → AudioContext (16kHz resample)
+    → AudioWorkletNode → PCMProcessor (audio thread)
+    → postMessage → Main thread → Float32 to Int16
+    → WebSocket binary frame → Server → send_realtime()
 ```
 
-#### Client-Side: Sending Images
+**Key concepts:**
 
-Images are captured from the camera, converted to JPEG, and sent as base64-encoded JSON messages. Unlike audio which streams continuously as binary data, images are sent as discrete snapshots when the user explicitly captures a frame. The Live API can process these images alongside audio and text for multimodal understanding.
+| Component | Purpose |
+|-----------|---------|
+| `AudioContext({ sampleRate: 16000 })` | Resample to Live API's required 16kHz |
+| `AudioWorklet` | Process audio on separate thread (no glitches) |
+| `Float32 → Int16` | Convert Web Audio format to PCM |
+| Binary WebSocket frame | More efficient than base64 encoding |
 
-**JavaScript (app.js):**
+### Understand Audio Response Events
 
-The `openCameraPreview()` function initializes camera access and displays a live preview to the user. This allows users to see what the camera sees before capturing an image.
+Since we configured `response_modalities=["AUDIO"]`, the model returns audio in events:
+
+```python
+# Audio arrives as inline_data in content parts
+if event.content and event.content.parts:
+    for part in event.content.parts:
+        if part.inline_data:
+            # Base64-encoded 24kHz PCM audio
+            mime_type = part.inline_data.mime_type  # "audio/pcm;rate=24000"
+            audio_data = part.inline_data.data       # Base64 string
+```
+
+The frontend's audio player worklet handles:
+1. Base64 decoding
+2. Ring buffer for smooth playback
+3. 24kHz PCM to speaker output
+
+### Client Code: Audio Playback with Ring Buffer
+
+The frontend plays audio using an AudioWorklet with a ring buffer for smooth, glitch-free playback:
+
+**Setting up the audio player (audio-player.js:5-24):**
 
 ```javascript
-// bidi-demo/app/static/js/app.js:803-830
-// Open camera and start preview
+// audio-player.js:5-24 - Start audio playback
+export async function startAudioPlayerWorklet() {
+    // Create AudioContext at 24kHz (Live API output format)
+    const audioContext = new AudioContext({ sampleRate: 24000 });
+
+    // Load the AudioWorklet processor
+    const workletURL = new URL('./pcm-player-processor.js', import.meta.url);
+    await audioContext.audioWorklet.addModule(workletURL);
+
+    // Create and connect the player node to speakers
+    const audioPlayerNode = new AudioWorkletNode(audioContext, 'pcm-player-processor');
+    audioPlayerNode.connect(audioContext.destination);
+
+    return [audioPlayerNode, audioContext];
+}
+```
+
+**The ring buffer player (pcm-player-processor.js:5-75):**
+
+```javascript
+// pcm-player-processor.js:5-75
+class PCMPlayerProcessor extends AudioWorkletProcessor {
+    constructor() {
+        super();
+
+        // Ring buffer: 24kHz × 180 seconds capacity
+        this.bufferSize = 24000 * 180;
+        this.buffer = new Float32Array(this.bufferSize);
+        this.writeIndex = 0;
+        this.readIndex = 0;
+
+        this.port.onmessage = (event) => {
+            // Handle interruption - clear buffer immediately
+            if (event.data.command === 'endOfAudio') {
+                this.readIndex = this.writeIndex;  // Empty the buffer
+                return;
+            }
+
+            // Add audio samples to ring buffer
+            const int16Samples = new Int16Array(event.data);
+            this._enqueue(int16Samples);
+        };
+    }
+
+    _enqueue(int16Samples) {
+        for (let i = 0; i < int16Samples.length; i++) {
+            // Convert Int16 to Float32 [-1, 1]
+            const floatVal = int16Samples[i] / 32768;
+            this.buffer[this.writeIndex] = floatVal;
+            this.writeIndex = (this.writeIndex + 1) % this.bufferSize;
+        }
+    }
+
+    process(inputs, outputs, parameters) {
+        const output = outputs[0];
+
+        for (let frame = 0; frame < output[0].length; frame++) {
+            output[0][frame] = this.buffer[this.readIndex];  // Left channel
+            if (output.length > 1) {
+                output[1][frame] = this.buffer[this.readIndex];  // Right (mono→stereo)
+            }
+
+            if (this.readIndex !== this.writeIndex) {
+                this.readIndex = (this.readIndex + 1) % this.bufferSize;
+            }
+        }
+        return true;
+    }
+}
+
+registerProcessor('pcm-player-processor', PCMPlayerProcessor);
+```
+
+**Receiving and playing audio (app.js:341-693, excerpt):**
+
+```javascript
+// app.js:341-693 - In websocket.onmessage handler (excerpt)
+if (adkEvent.content && adkEvent.content.parts) {
+    for (const part of adkEvent.content.parts) {
+        if (part.inlineData && part.inlineData.mimeType.startsWith("audio/pcm")) {
+            // Decode base64 audio and send to player
+            const audioData = base64ToArrayBuffer(part.inlineData.data);
+            audioPlayerNode.port.postMessage(audioData);
+        }
+    }
+}
+
+function base64ToArrayBuffer(base64) {
+    const binaryString = atob(base64);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+    }
+    return bytes.buffer;
+}
+```
+
+**Why a ring buffer?**
+
+```
+Without ring buffer:
+  Network jitter → Audio gaps → Choppy playback
+
+With ring buffer:
+  Network jitter → Buffer absorbs → Smooth playback
+
+Ring buffer visualization:
+     writeIndex (network writes here)
+         ↓
+[ ][█][█][█][█][ ][ ][ ]
+            ↑
+        readIndex (speaker reads here)
+```
+
+The buffer absorbs timing variations between network arrival and audio playback, ensuring smooth output even with irregular packet delivery.
+
+---
+
+## Step 8: Add Image Input (10 min)
+
+Let's add camera/image support for multimodal AI.
+
+### Activate Step 8
+
+Copy the step 8 source file to `main.py`:
+
+```bash
+cp step8_main.py main.py
+```
+
+Open `main.py` in the editor to examine the new code. Key additions:
+
+- **Image message handling**: Detects `{"type": "image", ...}` JSON messages
+- **Base64 decoding**: `base64.b64decode()` converts image data
+- **types.Blob for images**: Creates blob with `image/jpeg` MIME type
+- **send_realtime() for images**: Sends image same as audio
+
+### Test Image Input
+
+After the server reloads:
+
+1. Click the camera button
+2. Allow camera access
+3. Capture an image
+4. Ask "What do you see in this image?"
+
+**Checkpoint**: Multimodal AI working!
+
+### Understand Image Format
+
+| Property | Recommendation |
+|----------|----------------|
+| Format | JPEG or PNG |
+| Resolution | 768x768 recommended |
+| Frame rate | 1 FPS max for video |
+
+Images are sent the same way as audio—via `send_realtime()`. The model processes them alongside text and audio for multimodal understanding.
+
+### Client Code: Camera Capture and Image Sending
+
+The frontend captures images from the camera using Canvas API and sends them as base64-encoded JSON:
+
+**Opening camera preview (app.js:803-830):**
+
+```javascript
+// app.js:803-830 - Open camera and start preview
 async function openCameraPreview() {
+    // Request camera access
     cameraStream = await navigator.mediaDevices.getUserMedia({
         video: {
             width: { ideal: 768 },
             height: { ideal: 768 },
-            facingMode: 'user'
+            facingMode: 'user'  // Front camera on mobile
         }
     });
+
+    // Display live preview
     cameraPreview.srcObject = cameraStream;
     cameraModal.classList.add('show');
 }
 ```
 
-**Understanding camera access:**
-
-- **`getUserMedia()` API**: This is the standard Web API for accessing media devices. Unlike audio capture which requires AudioWorklet for processing, video can be displayed directly in an HTML `<video>` element.
-
-- **Video constraints**: The `width` and `height` are set to `ideal: 768` pixels. The browser will try to match these dimensions but may adjust based on camera capabilities. A square aspect ratio works well for the Live API.
-
-- **`facingMode: 'user'`**: This constraint requests the front-facing camera on mobile devices. On desktops, it typically selects the default webcam.
-
-- **MediaStream handling**: The returned `cameraStream` is a MediaStream object that can be assigned to a `<video>` element's `srcObject` property for live preview.
-
-**Image capture and encoding:**
-
-The `captureImageFromPreview()` function captures a single frame from the live video preview, converts it to JPEG format, and encodes it as base64 for transmission. This multi-step process uses the HTML Canvas API as an intermediary for image processing.
+**Capturing and sending an image (app.js:848-904, 906-917):**
 
 ```javascript
-// bidi-demo/app/static/js/app.js:848-903
-// Capture image from the live preview
+// app.js:848-904 - Capture image from preview
 function captureImageFromPreview() {
-    // Create canvas to capture the frame
+    // Create canvas matching video dimensions
     const canvas = document.createElement('canvas');
     canvas.width = cameraPreview.videoWidth;
     canvas.height = cameraPreview.videoHeight;
@@ -998,48 +1327,21 @@ function captureImageFromPreview() {
     // Draw current video frame to canvas
     context.drawImage(cameraPreview, 0, 0, canvas.width, canvas.height);
 
-    // Convert canvas to blob and send
+    // Convert to JPEG blob, then to base64
     canvas.toBlob((blob) => {
         const reader = new FileReader();
         reader.onloadend = () => {
-            // Remove data:image/jpeg;base64, prefix
+            // Remove "data:image/jpeg;base64," prefix
             const base64data = reader.result.split(',')[1];
             sendImage(base64data);
         };
         reader.readAsDataURL(blob);
-    }, 'image/jpeg', 0.85);
+    }, 'image/jpeg', 0.85);  // 85% quality
 
     closeCameraPreview();
 }
-```
 
-**Step-by-step image capture process:**
-
-1. **Canvas creation**: A temporary canvas element is created with dimensions matching the video's actual resolution (`videoWidth` and `videoHeight`). This ensures the captured image matches the source quality.
-
-2. **Frame drawing**: `context.drawImage()` copies the current video frame onto the canvas. This effectively takes a "screenshot" of the video at that exact moment.
-
-3. **JPEG conversion**: `canvas.toBlob()` converts the canvas content to a Blob in JPEG format. The third parameter (`0.85`) sets the quality level (85%), balancing image quality against file size.
-
-4. **Base64 encoding**: A FileReader converts the Blob to a data URL, which includes the base64-encoded image data. The `split(',')[1]` removes the `data:image/jpeg;base64,` prefix, leaving only the raw base64 data.
-
-5. **Asynchronous flow**: The `toBlob()` and `readAsDataURL()` operations are asynchronous, using callbacks to handle the results. The image is sent only after encoding completes.
-
-**Why base64 instead of binary?**
-
-Unlike audio which uses binary WebSocket frames, images are sent as base64-encoded JSON for several reasons:
-
-- Images are sent infrequently (on user action), so the 33% size overhead of base64 is acceptable
-- JSON messages can include metadata like `mimeType` alongside the data
-- The server-side handler can easily distinguish image messages from text messages by checking the `type` field
-
-**Sending the image to the server:**
-
-The `sendImage()` function packages the base64-encoded image data into a JSON message and sends it over the WebSocket connection. The server-side handler parses this JSON and forwards the image to the Live API.
-
-```javascript
-// bidi-demo/app/static/js/app.js:906-916
-// Send image to server as JSON
+// app.js:906-917 - Send image to server
 function sendImage(base64Image) {
     if (websocket && websocket.readyState === WebSocket.OPEN) {
         const jsonMessage = JSON.stringify({
@@ -1052,806 +1354,89 @@ function sendImage(base64Image) {
 }
 ```
 
-**Understanding the JSON message structure:**
-
-- **`type: "image"`**: This field allows the server to identify the message type. The server-side `upstream_task()` checks this field to determine how to process incoming messages (text vs. image).
-
-- **`data`**: Contains the raw base64-encoded image data without any prefix. This is decoded on the server using Python's `base64.b64decode()`.
-
-- **`mimeType: "image/jpeg"`**: Specifies the image format so the server can set the correct MIME type when creating the `types.Blob` for the Live API. This could also be `"image/png"` or other supported formats.
-
-**Server-side image handling:**
-
-When the server receives this JSON message, it processes it in the `upstream_task()`:
-
-```python
-# Server extracts and sends image to Live API
-image_data = base64.b64decode(json_message["data"])
-mime_type = json_message.get("mimeType", "image/jpeg")
-image_blob = types.Blob(mime_type=mime_type, data=image_data)
-live_request_queue.send_realtime(image_blob)
-```
-
-**Complete image data flow:**
+**Image capture flow:**
 
 ```
 Camera → MediaStream → <video> element (preview)
-    → Canvas (drawImage) → toBlob (JPEG 85%)
-    → FileReader → base64 encoding → JSON message
-    → WebSocket (text frame) → Server → base64 decode
-    → types.Blob → LiveRequestQueue.send_realtime() → Live API
+    → User clicks "Capture"
+    → Canvas.drawImage() (screenshot)
+    → canvas.toBlob() (JPEG 85%)
+    → FileReader → base64 encoding
+    → JSON message → WebSocket text frame
+    → Server → base64.b64decode() → types.Blob
+    → live_request_queue.send_realtime()
 ```
 
-### 4.4 Downstream Task
+**Why base64 for images (not binary)?**
 
-The downstream task processes all events from the model, forming the other half of the concurrent pair that enables bidirectional streaming. While the upstream task sends user input to the model, this task receives model output and forwards it to the client.
+| Approach | Pros | Cons |
+|----------|------|------|
+| Binary frame | Smaller (no encoding overhead) | Can't include metadata |
+| Base64 JSON | Includes mimeType, type field | 33% larger |
 
-```python
-# bidi-demo/app/main.py:219-234
-async def downstream_task() -> None:
-    """Receives Events from run_live() and sends to WebSocket."""
-    # run_live() is an async generator - yields events as they arrive
-    async for event in runner.run_live(
-        user_id=user_id,
-        session_id=session_id,
-        live_request_queue=live_request_queue,  # Same queue used by upstream task
-        run_config=run_config,
-    ):
-        # Convert Pydantic model to JSON, excluding None fields for cleaner output
-        event_json = event.model_dump_json(exclude_none=True, by_alias=True)
-        await websocket.send_text(event_json)  # Forward to browser
+For images sent infrequently (on user action), base64 overhead is acceptable. The JSON wrapper lets the server distinguish image messages from text messages using the `type` field.
+
+**Message comparison:**
+
+```javascript
+// Text message
+{"type": "text", "text": "Hello"}
+
+// Image message
+{"type": "image", "data": "/9j/4AAQ...", "mimeType": "image/jpeg"}
+
+// Audio - binary frame (no JSON wrapper)
+[raw PCM bytes]
 ```
 
-**Understanding the downstream loop:**
+---
 
-- **`runner.run_live()`**: This is an async generator that yields events as they arrive from the Live API. It's the primary interface for receiving model output. The generator runs until the session ends or an error occurs.
+## Wrap-up & Key Takeaways
 
-- **`async for event`**: This loop iterates over events as they're yielded by the generator. Each iteration is non-blocking—while waiting for the next event, Python can execute other tasks (like the upstream task).
+### What You Built
 
-- **Shared queue**: The `live_request_queue` parameter connects this task to the upstream task. Both tasks use the same queue—upstream writes to it, and `run_live()` reads from it internally.
+You built a complete bidirectional streaming AI application from scratch:
 
-- **`run_config`**: The configuration you created during session initialization. It controls response modalities, transcription settings, and advanced features.
+| Component | What It Does |
+|-----------|--------------|
+| Agent | Defines AI personality and tools |
+| SessionService | Stores conversation history |
+| Runner | Orchestrates streaming lifecycle |
+| LiveRequestQueue | Sends input to model |
+| run_live() | Receives streaming events |
 
-**Understanding event serialization:**
+### The 4-Phase Lifecycle
 
-- **`event.model_dump_json()`**: ADK events are Pydantic models. This method converts the event to a JSON string, which can be sent over WebSocket.
+```
+Phase 1: Application Init  →  Agent, SessionService, Runner (once)
+Phase 2: Session Init      →  RunConfig, Session, LiveRequestQueue (per connection)
+Phase 3: Bidi-streaming    →  upstream_task + downstream_task (concurrent)
+Phase 4: Termination       →  close() the queue (always in finally)
+```
 
-- **`exclude_none=True`**: Omits fields with `None` values from the JSON output. This reduces message size and makes the JSON cleaner for debugging.
-
-- **`by_alias=True`**: Uses camelCase field names (e.g., `turnComplete` instead of `turn_complete`) to match JavaScript conventions.
-
-**Why this design works:**
-
-The simplicity of this task is intentional. The server acts as a transparent proxy, forwarding events from the Live API to the client without modification. All event processing logic lives in the client-side JavaScript, keeping the server lightweight and scalable.
-
-This design allows you to:
-
-1. Add new event types without modifying server code
-2. Customize event handling per-client
-3. Scale the server horizontally (it's stateless except for the WebSocket connection)
-
-**Event Types You'll Receive:**
-
-| Event Field | Content | When |
-|-------------|---------|------|
-| `event.content` | Text or audio parts | Model generates response |
-| `event.input_transcription` | User speech → text | VAD detects user spoke |
-| `event.output_transcription` | Model speech → text | Model generates audio |
-| `event.actions` | Tool calls | Model invokes a tool |
-| `event.error` | Error details | Something went wrong |
-
-**Processing Specific Events:**
+### Key Code Patterns
 
 ```python
-# bidi-demo/app/main.py:225-233 (event processing example)
+# Upstream: Send text
+content = types.Content(parts=[types.Part(text="Hello")])
+live_request_queue.send_content(content)
+
+# Upstream: Send audio/images
+blob = types.Blob(mime_type="audio/pcm;rate=16000", data=audio_bytes)
+live_request_queue.send_realtime(blob)
+
+# Downstream: Receive events
 async for event in runner.run_live(...):
-    # Text or Audio content from the model
-    if event.content and event.content.parts:
-        for part in event.content.parts:
-            if part.text:
-                # Text response (may arrive with partial=True for streaming)
-                print(f"Model text: {part.text}")
-            if part.inline_data:
-                # Audio response - raw bytes at 24kHz PCM
-                audio_bytes = part.inline_data.data
+    await websocket.send_text(event.model_dump_json())
 
-    # User's speech transcribed to text
-    if event.input_transcription and event.input_transcription.text:
-        print(f"User said: {event.input_transcription.text}")
-
-    # Model's speech transcribed to text (for display/logging)
-    if event.output_transcription and event.output_transcription.text:
-        print(f"Model said: {event.output_transcription.text}")
-```
-
-This pattern shows how to extract different types of content from events. The same event may contain multiple fields.
-
-#### Understanding run_live() Events
-
-The return path—from the AI back to your application—centers on `run_live()`. This async generator is the heart of ADK streaming, yielding events in real-time without buffering.
-
-![Comprehensive Summary of ADK Live Event Handling: The run_live() Method](assets/run_live.png)
-
-**The Seven Event Types:**
-
-| Event Type | Field | Description |
-|------------|-------|-------------|
-| Text | `event.content.parts[0].text` | Model's written response (arrives incrementally with `partial=True`) |
-| Audio (inline) | `event.content.parts[0].inline_data` | Real-time audio for immediate playback (not persisted) |
-| Audio (file) | `event.content.parts[0].file_data` | References stored artifacts when `save_live_blob` is enabled |
-| Input Transcription | `event.input_transcription` | User speech converted to text |
-| Output Transcription | `event.output_transcription` | Model speech converted to text |
-| Metadata | `event.usage_metadata` | Token usage for cost monitoring |
-| Tool Calls | `event.actions` | Function execution (ADK handles automatically) |
-| Errors | `event.error` | Error code and message |
-
-**The Three Flow Control Flags:**
-
-| Flag | Meaning | UI Action |
-|------|---------|-----------|
-| `partial` | Incremental chunk vs complete text | Continue accumulating text |
-| `interrupted` | User started speaking while model was responding | Stop audio playback immediately |
-| `turn_complete` | Model finished its response | Hide typing indicator, re-enable input |
-
-> **Why `interrupted` matters:** This flag is what makes voice AI feel natural. Without it, users must wait silently for the AI to finish speaking. With it, conversation flows like it does between humans.
-
-#### Client-Side: Receiving Events
-
-The client processes ADK events received from the WebSocket. Each event type requires different handling:
-
-##### Flow Control Events
-
-These events manage conversation state and enable natural interruption:
-
-```javascript
-// bidi-demo/app/static/js/app.js:351-370
-websocket.onmessage = function(event) {
-    const adkEvent = JSON.parse(event.data);
-
-    // Handle turn complete - model finished responding
-    if (adkEvent.turnComplete === true) {
-        // Remove typing indicators, reset state for next turn
-        currentMessageId = null;
-        currentBubbleElement = null;
-        return;
-    }
-
-    // Handle interrupted - user started speaking while model was responding
-    if (adkEvent.interrupted === true) {
-        // Stop audio playback immediately
-        if (audioPlayerNode) {
-            audioPlayerNode.port.postMessage({ command: "endOfAudio" });
-        }
-        // Mark message as interrupted in UI
-        if (currentBubbleElement) {
-            currentBubbleElement.classList.add("interrupted");
-        }
-        return;
-    }
-    // ... handle other events
-};
-```
-
-**Why this matters:** The `interrupted` flag enables natural conversation. When the user starts speaking, the model's audio playback stops immediately—just like interrupting someone in real life.
-
-##### Transcription Events
-
-Transcription events convert speech to text for display in the chat:
-
-```javascript
-// bidi-demo/app/static/js/app.js:373-408
-// Handle input transcription (user's speech → text)
-if (adkEvent.inputTranscription && adkEvent.inputTranscription.text) {
-    const text = adkEvent.inputTranscription.text;
-    const isFinished = adkEvent.inputTranscription.finished;
-
-    if (currentInputTranscriptionId == null) {
-        // Create new transcription bubble for user
-        currentInputTranscriptionElement = createMessageBubble(text, true, !isFinished);
-        messagesDiv.appendChild(currentInputTranscriptionElement);
-    } else {
-        // Update existing bubble as more words are recognized
-        updateMessageBubble(currentInputTranscriptionElement, text, !isFinished);
-    }
-}
-
-// Handle output transcription (model's speech → text)
-if (adkEvent.outputTranscription && adkEvent.outputTranscription.text) {
-    const text = adkEvent.outputTranscription.text;
-    const isFinished = adkEvent.outputTranscription.finished;
-
-    if (currentOutputTranscriptionId == null) {
-        // Create new transcription bubble for agent
-        currentOutputTranscriptionElement = createMessageBubble(text, false, !isFinished);
-        messagesDiv.appendChild(currentOutputTranscriptionElement);
-    } else {
-        // Update existing bubble as speech continues
-        updateMessageBubble(currentOutputTranscriptionElement, text, !isFinished);
-    }
-}
-```
-
-**Why this matters:** Transcriptions arrive incrementally with `finished: false`, then a final version with `finished: true`. The UI updates progressively so users see their words appear in real-time.
-
-##### Content Events (Text and Audio)
-
-Content events carry the model's actual response—either text or audio:
-
-```javascript
-// bidi-demo/app/static/js/app.js:410-435
-if (adkEvent.content && adkEvent.content.parts) {
-    for (const part of adkEvent.content.parts) {
-        // Handle audio data - send to AudioWorklet for playback
-        if (part.inlineData) {
-            const mimeType = part.inlineData.mimeType;
-            const data = part.inlineData.data;
-
-            if (mimeType.startsWith("audio/pcm") && audioPlayerNode) {
-                // Decode base64 and send to audio player's ring buffer
-                audioPlayerNode.port.postMessage(base64ToArray(data));
-            }
-        }
-
-        // Handle text - create or update message bubble
-        if (part.text) {
-            if (currentMessageId == null) {
-                // Create new message bubble
-                currentBubbleElement = createMessageBubble(part.text, false, true);
-                messagesDiv.appendChild(currentBubbleElement);
-            } else {
-                // Append to existing bubble (streaming text)
-                const existingText = currentBubbleElement.querySelector(".bubble-text").textContent;
-                updateMessageBubble(currentBubbleElement, existingText + part.text, true);
-            }
-        }
-    }
-}
-```
-
-**Why this matters:** Audio chunks arrive continuously and are sent to an AudioWorklet ring buffer for smooth playback. Text chunks are appended to create the streaming "typing" effect you see in the chat.
-
-#### Client-Side: Audio Playback
-
-Audio playback is the inverse of audio capture—it receives PCM audio chunks from the server and plays them through the user's speakers. A ring buffer smooths out network jitter to prevent audio gaps and pops. Like audio capture, playback uses AudioWorklet to run on a dedicated audio thread.
-
-**JavaScript (audio-player.js):**
-
-The `startAudioPlayerWorklet()` function sets up the audio playback pipeline. It creates an AudioContext at 24kHz (matching the Live API's output format) and connects an AudioWorkletNode to the audio destination (speakers).
-
-```javascript
-// bidi-demo/app/static/js/audio-player.js:5-24
-// Start audio playback worklet
-export async function startAudioPlayerWorklet() {
-    // Create AudioContext at 24kHz (Live API output format)
-    const audioContext = new AudioContext({ sampleRate: 24000 });
-
-    // Load the AudioWorklet processor
-    const workletURL = new URL('./pcm-player-processor.js', import.meta.url);
-    await audioContext.audioWorklet.addModule(workletURL);
-
-    // Create and connect the player node
-    const audioPlayerNode = new AudioWorkletNode(audioContext, 'pcm-player-processor');
-    audioPlayerNode.connect(audioContext.destination);
-
-    return [audioPlayerNode, audioContext];
-}
-```
-
-**Key differences from audio capture:**
-
-| Aspect | Audio Capture | Audio Playback |
-|--------|---------------|----------------|
-| Sample rate | 16kHz (input format) | 24kHz (output format) |
-| Data direction | Microphone → WebSocket | WebSocket → Speakers |
-| Node connection | Source → WorkletNode | WorkletNode → Destination |
-| Data format | Float32 → Int16 | Int16 → Float32 |
-
-**JavaScript (pcm-player-processor.js):**
-
-The `PCMPlayerProcessor` class is the heart of audio playback. It implements a ring buffer that absorbs network timing variations, ensuring smooth audio even when packets arrive at irregular intervals.
-
-```javascript
-// bidi-demo/app/static/js/pcm-player-processor.js:5-75
-// AudioWorklet processor for playing streaming PCM audio
-class PCMPlayerProcessor extends AudioWorkletProcessor {
-    constructor() {
-        super();
-
-        // Ring buffer: 24kHz × 180 seconds
-        this.bufferSize = 24000 * 180;
-        this.buffer = new Float32Array(this.bufferSize);
-        this.writeIndex = 0;
-        this.readIndex = 0;
-
-        // Handle incoming audio data from main thread
-        this.port.onmessage = (event) => {
-            // Handle interruption - clear buffer
-            if (event.data.command === 'endOfAudio') {
-                this.readIndex = this.writeIndex;
-                return;
-            }
-
-            // Decode Int16 samples from ArrayBuffer
-            const int16Samples = new Int16Array(event.data);
-            this._enqueue(int16Samples);
-        };
-    }
-
-    // Add Int16 samples to ring buffer
-    _enqueue(int16Samples) {
-        for (let i = 0; i < int16Samples.length; i++) {
-            // Convert Int16 to Float32 [-1, 1]
-            const floatVal = int16Samples[i] / 32768;
-            this.buffer[this.writeIndex] = floatVal;
-            this.writeIndex = (this.writeIndex + 1) % this.bufferSize;
-
-            // Handle overflow (overwrite oldest samples)
-            if (this.writeIndex === this.readIndex) {
-                this.readIndex = (this.readIndex + 1) % this.bufferSize;
-            }
-        }
-    }
-
-    // Called by Web Audio system (~128 samples at a time)
-    process(inputs, outputs, parameters) {
-        const output = outputs[0];
-        const framesPerBlock = output[0].length;
-
-        for (let frame = 0; frame < framesPerBlock; frame++) {
-            // Write to left channel
-            output[0][frame] = this.buffer[this.readIndex];
-            // Write to right channel (mono to stereo)
-            if (output.length > 1) {
-                output[1][frame] = this.buffer[this.readIndex];
-            }
-
-            // Advance read index (unless buffer empty)
-            if (this.readIndex !== this.writeIndex) {
-                this.readIndex = (this.readIndex + 1) % this.bufferSize;
-            }
-        }
-
-        return true; // Keep processor alive
-    }
-}
-
-registerProcessor('pcm-player-processor', PCMPlayerProcessor);
-```
-
-**Understanding the ring buffer:**
-
-A ring buffer (circular buffer) is a fixed-size array where data wraps around from the end to the beginning. It's perfect for streaming audio because:
-
-- **No memory allocation**: The buffer is pre-allocated, avoiding garbage collection pauses
-- **Constant-time operations**: Writing and reading are O(1) operations
-- **Automatic overwrite**: When full, old samples are discarded to make room for new ones
-
-```
-Ring buffer visualization (simplified):
-
-     writeIndex
-         ↓
-[ ][█][█][█][█][ ][ ][ ]
-            ↑
-        readIndex
-
-Audio arrives → writes at writeIndex → advances writeIndex
-Audio plays   → reads at readIndex  → advances readIndex
-```
-
-**How the buffer handles timing:**
-
-- **Network arrives faster than playback**: Buffer fills up, providing a cushion against future delays
-- **Network arrives slower than playback**: Buffer drains but doesn't underrun until completely empty
-- **Network jitter**: Variations are absorbed by the buffer, keeping playback smooth
-
-**Understanding interruption handling:**
-
-When the user interrupts the model (starts speaking while the model is responding), the `endOfAudio` command is sent. The processor handles this by setting `readIndex = writeIndex`, which effectively empties the buffer. This causes immediate silence—the model's audio stops playing instantly.
-
-**Format conversion (Int16 to Float32):**
-
-The Live API sends 16-bit signed PCM integers, but Web Audio requires 32-bit floats:
-
-- **Input**: Int16 values from -32768 to 32767
-- **Output**: Float32 values from -1.0 to 1.0
-- **Conversion**: Divide by 32768 (not 32767) for symmetric scaling
-
-**Mono to stereo duplication:**
-
-The Live API sends mono audio (single channel), but most audio outputs expect stereo (left + right channels). The processor writes the same sample to both channels, creating centered mono playback.
-
-**Complete audio playback flow:**
-
-```
-Server → WebSocket (JSON with base64 audio)
-    → Main thread (base64 decode) → postMessage
-    → PCMPlayerProcessor (audio thread)
-    → Ring buffer → Int16 to Float32
-    → process() output → AudioContext destination → Speakers
-```
-
-### 4.5 Concurrent Execution and Termination
-
-The upstream and downstream tasks run concurrently, enabling true bidirectional communication. This is the architectural pattern that makes real-time conversation possible—both tasks execute simultaneously, allowing the user to send input while receiving model output.
-
-```python
-# bidi-demo/app/main.py:236-253
-# ========================================
-# Phase 3: Active Session (bidirectional communication)
-# ========================================
-
-try:
-    # Run both tasks concurrently - this is the heart of bidi-streaming
-    # upstream_task: WebSocket → LiveRequestQueue (user input)
-    # downstream_task: run_live() → WebSocket (model output)
-    await asyncio.gather(upstream_task(), downstream_task())
-except WebSocketDisconnect:
-    logger.debug("Client disconnected normally")  # Expected when user closes tab
-except Exception as e:
-    logger.error(f"Unexpected error: {e}")  # Log unexpected failures
+# Always close!
 finally:
-    # ========================================
-    # Phase 4: Session Termination (cleanup)
-    # ========================================
-
-    # CRITICAL: Always close the queue to release Live API resources
     live_request_queue.close()
 ```
 
-**Understanding asyncio.gather():**
+### Why ADK Over Raw Live API?
 
-`asyncio.gather()` is the key to concurrent execution. It takes multiple coroutines and runs them simultaneously within a single thread:
-
-```
-                    ┌─────────────────────┐
-                    │  asyncio.gather()   │
-                    └─────────────────────┘
-                              │
-              ┌───────────────┴───────────────┐
-              ▼                               ▼
-    ┌─────────────────┐             ┌─────────────────┐
-    │  upstream_task  │             │ downstream_task │
-    │                 │             │                 │
-    │ await receive() │←──yields───→│ await run_live()│
-    │ send to queue   │             │ await send_text │
-    └─────────────────┘             └─────────────────┘
-```
-
-When one task awaits (e.g., waiting for a WebSocket message), Python's event loop switches to the other task. This cooperative multitasking enables true concurrency without threading complexity.
-
-**Understanding exception propagation:**
-
-- **`WebSocketDisconnect`**: Raised when the client closes the browser tab or loses network connectivity. This is a normal exit condition, not an error.
-
-- **Other exceptions**: Any unhandled exception in either task propagates up. The `gather()` call returns when either task raises an exception, effectively stopping both tasks.
-
-- **Task cancellation**: When one task fails, `gather()` cancels the other task. This ensures both tasks stop together.
-
-**Understanding the finally block:**
-
-The `finally` block executes regardless of how the `try` block exits—whether normally, via exception, or via task cancellation. This guarantees cleanup happens:
-
-- **Why `close()` is critical**: `LiveRequestQueue.close()` sends a termination signal to the Live API, closing the underlying WebSocket connection. Without this, the connection remains open, consuming API quota and server resources.
-
-- **Resource leak prevention**: If you forget to call `close()`, the Live API session persists until it times out (approximately 10 minutes). During this time, you're consuming one of your concurrent session slots.
-
-**Common termination scenarios:**
-
-| Scenario | What Happens | Cleanup |
-|----------|--------------|---------|
-| User closes browser tab | `WebSocketDisconnect` raised | `finally` runs, queue closed |
-| Network disconnection | `WebSocketDisconnect` raised | `finally` runs, queue closed |
-| Server error | Exception logged | `finally` runs, queue closed |
-| Model error | Exception in `run_live()` | `finally` runs, queue closed |
-
-**Why this pattern matters:**
-
-This try/except/finally pattern is the recommended way to manage streaming sessions. It ensures:
-
-1. **Clean exits**: Normal disconnections are handled gracefully without error logs
-2. **Error visibility**: Unexpected errors are logged for debugging
-3. **Resource cleanup**: The Live API connection is always properly closed
-4. **Session persistence**: The session itself (conversation history) is preserved in SessionService for future reconnection
-
-### 4.6 RunConfig Deep Dive
-
-RunConfig is your control center for streaming behavior. Every aspect of a session—from audio format to cost limits—is configured here.
-
-![Comprehensive Summary of Live API RunConfig](assets/runconfig.png)
-
-**Demo Implementation:**
-
-The demo auto-detects the model type and configures RunConfig accordingly:
-
-```python
-# bidi-demo/app/main.py:107-124
-if is_native_audio:
-    # Native audio models require AUDIO response modality
-    run_config = RunConfig(
-        streaming_mode=StreamingMode.BIDI,           # Enable bidirectional streaming
-        response_modalities=["AUDIO"],               # Model responds with voice
-        input_audio_transcription=types.AudioTranscriptionConfig(),   # Transcribe user speech
-        output_audio_transcription=types.AudioTranscriptionConfig(),  # Transcribe model speech
-        session_resumption=types.SessionResumptionConfig(),           # Handle reconnections
-        proactivity=(
-            types.ProactivityConfig(proactive_audio=True) if proactivity else None
-        ),
-        enable_affective_dialog=affective_dialog if affective_dialog else None,
-    )
-else:
-    # Half-cascade models: use TEXT for faster performance
-    run_config = RunConfig(
-        streaming_mode=StreamingMode.BIDI,
-        response_modalities=["TEXT"],                # Model responds with text
-        session_resumption=types.SessionResumptionConfig(),
-    )
-```
-
-**Key configuration choices:**
-
-- **`streaming_mode=StreamingMode.BIDI`**: Required for WebSocket bidirectional streaming
-- **`response_modalities`**: Native audio models must use `["AUDIO"]`; half-cascade can use `["TEXT"]` for faster responses
-- **`input/output_audio_transcription`**: Enables the transcription events you saw in the Event Console
-- **`session_resumption`**: Automatically handles WebSocket reconnections (~10 min timeout)
-- **`proactivity`**: Allows the model to speak without waiting for user input
-- **`enable_affective_dialog`**: Model adapts tone based on detected emotions
-
-**Essential Parameters:**
-
-| Parameter | Purpose |
-|-----------|---------|
-| `response_modalities` | `["TEXT"]` for chat, `["AUDIO"]` for voice (choose one per session) |
-| `streaming_mode` | `BIDI` for WebSocket streaming, `SSE` for HTTP streaming |
-| `session_resumption` | Enable automatic reconnection after WebSocket timeouts (~10 min) |
-| `context_window_compression` | Remove session duration limits (15 min audio, 2 min video) |
-
-**Production Controls:**
-
-| Parameter | Purpose |
-|-----------|---------|
-| `max_llm_calls` | Cap invocations per session for cost control (SSE mode only) |
-| `save_live_blob` | Persist audio/video for debugging, compliance, or training |
-| `custom_metadata` | Attach key-value data for user segmentation or A/B testing |
-
-**Understanding Session Types:**
-
-One concept trips up many developers: ADK Session vs Live API session.
-
-- **ADK Session**: Persistent, lives in SessionService, survives restarts. User returns days later with history intact.
-- **Live API session**: Ephemeral, exists only during active `run_live()`. When loop ends, it's destroyed—but ADK persisted events.
-
-> **Quota planning:** Gemini Live API allows 50-1,000 concurrent sessions depending on tier. Vertex AI supports up to 1,000 per project.
-
-### 4.7 Client-Side: WebSocket Connection
-
-While the server handles ADK communication, the client manages the WebSocket connection. Here's how the client connects:
-
-**JavaScript (app.js):**
-
-```javascript
-// bidi-demo/app/static/js/app.js:10-12
-const userId = "demo-user";  // In production, use authenticated user ID
-const sessionId = "demo-session-" + Math.random().toString(36).substring(7);  // Unique per tab
-let websocket = null;  // WebSocket connection instance
-```
-
-Each browser tab gets a unique session ID, allowing multiple concurrent conversations per user.
-
-```javascript
-// bidi-demo/app/static/js/app.js:37-55
-function getWebSocketUrl() {
-    // Construct URL: ws://host/ws/{user_id}/{session_id}
-    const baseUrl = "ws://" + window.location.host + "/ws/" + userId + "/" + sessionId;
-    const params = new URLSearchParams();
-
-    // Pass RunConfig options as query parameters
-    if (enableProactivityCheckbox.checked) {
-        params.append("proactivity", "true");
-    }
-    if (enableAffectiveDialogCheckbox.checked) {
-        params.append("affective_dialog", "true");
-    }
-
-    const queryString = params.toString();
-    return queryString ? baseUrl + "?" + queryString : baseUrl;
-}
-```
-
-```javascript
-// bidi-demo/app/static/js/app.js:317-730
-function connectWebsocket() {
-    const ws_url = getWebSocketUrl();
-    websocket = new WebSocket(ws_url);
-
-    websocket.onopen = function() {
-        console.log("WebSocket connection opened.");
-        updateConnectionStatus(true);
-    };
-
-    websocket.onclose = function() {
-        console.log("WebSocket connection closed.");
-        updateConnectionStatus(false);
-        setTimeout(connectWebsocket, 5000);  // Auto-reconnect after 5 seconds
-    };
-}
-
-connectWebsocket();  // Connect immediately when page loads
-```
-
-**Key Points:**
-
-1. **Dynamic URL**: Session ID is generated per browser tab for isolation
-2. **Query parameters**: RunConfig options passed as URL query parameters
-3. **Auto-reconnect**: Client automatically reconnects on disconnection
-
----
-
-## Section 5: Experimentation & Customization (10 min)
-
-### 5.1 Modify the Agent
-
-Open `app/google_search_agent/agent.py` and customize the agent:
-
-```python
-# bidi-demo/app/google_search_agent/agent.py:1-18 (customization example)
-import os
-from google.adk.agents import Agent
-from google.adk.tools import google_search
-
-agent = Agent(
-    name="my_custom_agent",
-    # Use environment variable with fallback for flexibility
-    model=os.getenv("DEMO_AGENT_MODEL", "gemini-2.5-flash-native-audio-preview-12-2025"),
-
-    # The instruction is your system prompt - shapes personality and behavior
-    instruction="""You are a friendly travel assistant named Aria.
-
-    When helping users:
-    - Be enthusiastic about travel destinations
-    - Use Google Search for current information about places
-    - Suggest activities based on user interests
-    - Provide practical tips for travelers
-
-    Always maintain a warm, conversational tone.""",
-
-    tools=[google_search]  # Tools the agent can call
-)
-```
-
-Try changing the instruction to create different agent personalities—a tech support specialist, a language tutor, or a cooking assistant.
-
-**Restart the server** to apply changes:
-
-```bash
-# Stop the current server (Ctrl+C)
-python -m uvicorn main:app --reload --host 0.0.0.0 --port 8080
-```
-
-### 5.2 Add a Custom Tool
-
-Create a simple custom tool:
-
-```python
-# bidi-demo/app/google_search_agent/agent.py (custom tool example)
-from google.adk.tools import FunctionTool
-
-# Define a custom tool as a regular Python function
-# ADK automatically extracts the schema from type hints and docstring
-def get_current_time(timezone: str = "UTC") -> str:
-    """Get the current time in a specified timezone.
-
-    Args:
-        timezone: The timezone name (e.g., "America/New_York", "Asia/Tokyo")
-
-    Returns:
-        The current time as a formatted string
-    """
-    from datetime import datetime
-    import pytz  # pip install pytz
-
-    try:
-        tz = pytz.timezone(timezone)
-        current_time = datetime.now(tz)
-        return f"The current time in {timezone} is {current_time.strftime('%I:%M %p on %B %d, %Y')}"
-    except Exception as e:
-        return f"Could not get time for timezone {timezone}: {str(e)}"
-
-# Add the function directly to tools - ADK wraps it automatically
-agent = Agent(
-    name="my_agent",
-    model=os.getenv("DEMO_AGENT_MODEL"),
-    instruction="You are a helpful assistant with access to search and time tools.",
-    tools=[google_search, get_current_time]  # Mix built-in and custom tools
-)
-```
-
-ADK automatically calls your function when the model decides to use the tool. The docstring becomes the tool's description for the model.
-
-### 5.3 Experiment with RunConfig
-
-Try different configurations by modifying the WebSocket endpoint:
-
-**Enable Proactivity (Native Audio Only):**
-
-```python
-# bidi-demo/app/main.py:114-124 (proactivity example)
-run_config = RunConfig(
-    streaming_mode=StreamingMode.BIDI,
-    response_modalities=["AUDIO"],
-    # Proactivity: model can initiate responses without waiting for user input
-    proactivity=types.ProactivityConfig(proactive_audio=True),
-    # Affective dialog: model adapts tone based on user's emotional state
-    enable_affective_dialog=True,
-)
-```
-
-With proactivity enabled, the model may:
-- Offer suggestions without being asked
-- Anticipate user needs based on context
-- Ignore irrelevant input
-
-**Change the Voice:**
-
-```python
-# bidi-demo/app/main.py:114-124 (voice configuration example)
-run_config = RunConfig(
-    streaming_mode=StreamingMode.BIDI,
-    response_modalities=["AUDIO"],
-    # Configure the model's speaking voice
-    speech_config=types.SpeechConfig(
-        voice_config=types.VoiceConfig(
-            prebuilt_voice_config=types.PrebuiltVoiceConfig(
-                voice_name="Kore"  # Each voice has distinct personality
-            )
-        )
-    ),
-)
-```
-
-Voice selection affects the agent's perceived personality—experiment to find the right match for your use case.
-
-**Available Voices (Half-Cascade):**
-- Puck, Charon, Kore, Fenrir, Aoede, Leda, Orus, Zephyr
-
-**Native Audio Models:** Support extended voice library from [Text-to-Speech](https://cloud.google.com/text-to-speech) service.
-
-### 5.4 Quick Experiments Checklist
-
-Try these experiments and observe the differences:
-
-- [ ] Change the agent instruction to a different persona
-- [ ] Add a custom tool and invoke it by voice
-- [ ] Switch between TEXT and AUDIO response modalities
-- [ ] Enable proactivity and test with open-ended prompts
-- [ ] Change the voice and compare the sound
-
----
-
-## Section 6: Wrap-up & Resources (5 min)
-
-### 6.1 Key Takeaways
-
-1. **4-Phase Lifecycle**: Application Init → Session Init → Bidi-streaming → Termination
-
-2. **Concurrent Architecture**: Upstream (input) and downstream (events) tasks run simultaneously with `asyncio.gather()`
-
-3. **LiveRequestQueue Methods**:
-   - `send_content()`: Text messages (turn-based)
-   - `send_realtime()`: Audio/images (streaming)
-   - `close()`: End session (always in `finally` block)
-
-4. **run_live() Events**: Content, transcriptions, tool calls, errors - all streamed as they occur
-
-5. **RunConfig Controls**: Response modalities, transcription, proactivity, voice, VAD
-
-6. **Model Architectures**:
-   - Native Audio: Natural speech, AUDIO-only, advanced features
-   - Half-Cascade: TEXT and AUDIO, faster text, fewer features
-
-### 6.2 Why ADK Over Raw Live API?
-
-Now that you've experienced building with ADK, here's what it saved you from implementing yourself:
+Now that you've built a complete streaming application, here's what ADK saved you from implementing yourself:
 
 ![Raw Live API vs. ADK Bidi-streaming](assets/live_vs_adk.png)
 
@@ -1866,7 +1451,7 @@ Now that you've experienced building with ADK, here's what it saved you from imp
 
 > **The bottom line:** ADK reduces months of infrastructure development to days of application development. You focus on what your agent does, not how streaming works.
 
-### 6.3 Resources
+### Resources
 
 | Resource | URL |
 |----------|-----|
@@ -1875,41 +1460,28 @@ Now that you've experienced building with ADK, here's what it saved you from imp
 | Gemini Live API | https://ai.google.dev/gemini-api/docs/live |
 | Vertex AI Live API | https://cloud.google.com/vertex-ai/generative-ai/docs/live-api |
 | ADK Samples Repository | https://github.com/google/adk-samples |
-| Google AI Studio | https://aistudio.google.com |
 
-**ADK Bidi-streaming Developer Guide (5-Part Series):**
+### Next Steps
 
-| Part | Focus | What You'll Learn |
-|------|-------|-------------------|
-| [Part 1](https://google.github.io/adk-docs/streaming/dev-guide/part1/) | Foundation | Architecture, Live API platforms, 4-phase lifecycle |
-| [Part 2](https://google.github.io/adk-docs/streaming/dev-guide/part2/) | Upstream | Sending text, audio, video via LiveRequestQueue |
-| [Part 3](https://google.github.io/adk-docs/streaming/dev-guide/part3/) | Downstream | Event handling, tool execution, multi-agent workflows |
-| [Part 4](https://google.github.io/adk-docs/streaming/dev-guide/part4/) | Configuration | Session management, quotas, production controls |
-| [Part 5](https://google.github.io/adk-docs/streaming/dev-guide/part5/) | Multimodal | Audio specs, model architectures, advanced features |
-
-### 6.4 Next Steps
-
-After this workshop, consider exploring:
-
-1. **Multi-Agent Systems**: Create agents with different voices that hand off conversations
-2. **Custom Streaming Tools**: Build tools that yield video frames continuously
-3. **Production Deployment**: Use [Cloud Run](https://cloud.google.com/run) with DatabaseSessionService for scalability
-4. **Client-Side VAD**: Implement browser-based voice detection to reduce bandwidth
-5. **Session Resumption**: Handle disconnections gracefully with session state persistence
+1. **Read the full guide**: https://google.github.io/adk-docs/streaming/dev-guide/
+2. **Explore multi-agent**: Create agents that hand off conversations
+3. **Deploy to Cloud Run**: Scale your streaming app
+4. **Add session resumption**: Handle disconnections gracefully
+5. **Add custom tools**: Build tools that integrate with your backend services
 
 ---
 
-## Appendix A: Troubleshooting
+## Appendix: Troubleshooting
 
 ### Common Issues and Solutions
 
 | Issue | Possible Cause | Solution |
 |-------|---------------|----------|
 | Microphone not working | Browser permissions | Check site permissions, ensure HTTPS or localhost |
-| No audio response | Wrong model or modality | Verify native audio model, check response_modalities=["AUDIO"] |
-| API key errors | Missing or invalid key | Check .env file, verify GOOGLE_API_KEY is set correctly |
+| No audio response | Wrong model or modality | Verify native audio model, check `response_modalities=["AUDIO"]` |
+| API key errors | Missing or invalid key | Check `.env` file, verify credentials are set correctly |
 | WebSocket disconnects | Session timeout or error | Check server logs, implement reconnection logic |
-| Slow responses | TEXT modality on native audio | Use appropriate modality for model architecture |
+| Slow responses | Network latency | Check connection, consider closer region |
 | "Model not found" | Invalid model name | Check model name spelling, verify availability |
 
 ### Debugging Tips
@@ -1917,7 +1489,6 @@ After this workshop, consider exploring:
 **Enable Debug Logging:**
 
 ```python
-# bidi-demo/app/main.py:27-31
 import logging
 logging.basicConfig(level=logging.DEBUG)
 ```
@@ -1925,236 +1496,28 @@ logging.basicConfig(level=logging.DEBUG)
 **Check Server Logs:**
 
 Look for events in the terminal:
+
 ```
-DEBUG - [SERVER] Event: {"content": {"parts": [{"text": "Hello!"}]}}
+[UPSTREAM] User text: Hello
+[DOWNSTREAM] Event: {"content": {"parts": [{"text": "Hi there!"}]}}
 ```
 
 **Verify WebSocket Connection:**
 
 Open browser DevTools → Network → WS tab to see WebSocket frames.
 
----
+**Verify Audio Format:**
 
-## Appendix B: Environment Variables Reference
+Ensure audio is 16kHz mono PCM for input and expect 24kHz mono PCM for output.
+
+### Environment Variables Reference
 
 ```bash
-# Required
-GOOGLE_API_KEY=your_google_ai_studio_api_key
-
-# Optional - Model Selection
-DEMO_AGENT_MODEL=gemini-2.5-flash-native-audio-preview-12-2025
-
-# For Vertex AI (instead of Google AI Studio)
+# For Vertex AI (recommended for Cloud Shell)
 GOOGLE_CLOUD_PROJECT=your_project_id
 GOOGLE_CLOUD_LOCATION=us-central1
-```
+GOOGLE_GENAI_USE_VERTEXAI=TRUE
 
----
-
-## Appendix C: Quick Reference Card
-
-### LiveRequestQueue Methods
-
-```python
-# bidi-demo/app/main.py:169-217, 246-253
-# Text message (turn-based)
-content = types.Content(parts=[types.Part(text="Hello")])
-live_request_queue.send_content(content)
-
-# Audio chunk (streaming)
-audio_blob = types.Blob(mime_type="audio/pcm;rate=16000", data=audio_bytes)
-live_request_queue.send_realtime(audio_blob)
-
-# Image (streaming)
-image_blob = types.Blob(mime_type="image/jpeg", data=image_bytes)
-live_request_queue.send_realtime(image_blob)
-
-# End session
-live_request_queue.close()
-```
-
-### RunConfig Quick Reference
-
-```python
-# bidi-demo/app/main.py:114-124
-from google.adk.agents.run_config import RunConfig, StreamingMode
-from google.genai import types
-
-run_config = RunConfig(
-    # Required
-    streaming_mode=StreamingMode.BIDI,
-
-    # Response type
-    response_modalities=["AUDIO"],  # or ["TEXT"]
-
-    # Transcription
-    input_audio_transcription=types.AudioTranscriptionConfig(),
-    output_audio_transcription=types.AudioTranscriptionConfig(),
-
-    # Voice (optional)
-    speech_config=types.SpeechConfig(
-        voice_config=types.VoiceConfig(
-            prebuilt_voice_config=types.PrebuiltVoiceConfig(voice_name="Kore")
-        )
-    ),
-
-    # Advanced (native audio only)
-    proactivity=types.ProactivityConfig(proactive_audio=True),
-    enable_affective_dialog=True,
-)
-```
-
-### Event Processing Pattern
-
-```python
-# bidi-demo/app/main.py:225-233
-async for event in runner.run_live(...):
-    # Text/Audio content
-    if event.content and event.content.parts:
-        for part in event.content.parts:
-            if part.text:
-                handle_text(part.text)
-            if part.inline_data:
-                handle_audio(part.inline_data.data)
-
-    # Transcriptions
-    if event.input_transcription:
-        handle_user_speech(event.input_transcription.text)
-    if event.output_transcription:
-        handle_model_speech(event.output_transcription.text)
-
-    # Tool calls
-    if event.actions:
-        for action in event.actions:
-            handle_tool_call(action)
-```
-
----
-
-## Appendix D: Full-Stack Architecture Reference
-
-### Data Flow Diagram
-
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                              BROWSER (Client)                                │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                             │
-│  ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐         │
-│  │   app.js        │    │ audio-recorder  │    │  audio-player   │         │
-│  │                 │    │                 │    │                 │         │
-│  │ • WebSocket     │    │ • 16kHz capture │    │ • 24kHz playback│         │
-│  │ • Event handler │    │ • Float32→Int16 │    │ • Ring buffer   │         │
-│  │ • UI updates    │    │ • Binary frames │    │ • Int16→Float32 │         │
-│  └────────┬────────┘    └────────┬────────┘    └────────▲────────┘         │
-│           │                      │                      │                   │
-│           │    Text/Image JSON   │   Audio Binary       │  Audio Base64     │
-│           ▼                      ▼                      │                   │
-│  ┌────────────────────────────────────────────────────────────────┐        │
-│  │                        WebSocket                                │        │
-│  └────────────────────────────────────────────────────────────────┘        │
-│                                    │                  ▲                     │
-└────────────────────────────────────┼──────────────────┼─────────────────────┘
-                                     │                  │
-                              HTTPS/WSS                 │
-                                     │                  │
-┌────────────────────────────────────┼──────────────────┼─────────────────────┐
-│                              SERVER (Python)          │                     │
-├────────────────────────────────────┼──────────────────┼─────────────────────┤
-│                                    ▼                  │                     │
-│  ┌────────────────────────────────────────────────────────────────┐        │
-│  │                     FastAPI WebSocket Endpoint                  │        │
-│  └────────────────────────────────────────────────────────────────┘        │
-│           │                                           ▲                     │
-│           │                                           │                     │
-│  ┌────────▼────────┐                        ┌────────┴────────┐            │
-│  │  upstream_task  │                        │ downstream_task │            │
-│  │                 │                        │                 │            │
-│  │ • Receive WS    │                        │ • run_live()    │            │
-│  │ • Parse JSON    │                        │ • Yield events  │            │
-│  │ • Decode audio  │                        │ • Send to WS    │            │
-│  └────────┬────────┘                        └────────▲────────┘            │
-│           │                                          │                      │
-│           │  send_content()                          │                      │
-│           │  send_realtime()                         │                      │
-│           ▼                                          │                      │
-│  ┌─────────────────────────────────────────────────────────────┐           │
-│  │                    LiveRequestQueue                          │           │
-│  └─────────────────────────────────────────────────────────────┘           │
-│                                    │                  ▲                     │
-└────────────────────────────────────┼──────────────────┼─────────────────────┘
-                                     │                  │
-                              WebSocket                 │
-                                     │                  │
-┌────────────────────────────────────┼──────────────────┼─────────────────────┐
-│                              LIVE API (Google)        │                     │
-├────────────────────────────────────┼──────────────────┼─────────────────────┤
-│                                    ▼                  │                     │
-│  ┌─────────────────────────────────────────────────────────────┐           │
-│  │                      Gemini Model                            │           │
-│  │                                                              │           │
-│  │  • Process text/audio/image input                           │           │
-│  │  • Generate text/audio responses                            │           │
-│  │  • Voice Activity Detection (VAD)                           │           │
-│  │  • Tool execution                                           │           │
-│  │  • Transcription                                            │           │
-│  └─────────────────────────────────────────────────────────────┘           │
-│                                                                             │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
-
-### Client Files Reference
-
-| File | Purpose | Key Functions |
-|------|---------|---------------|
-| `app.js` | Main application logic | `connectWebsocket()`, `sendMessage()`, `sendImage()`, event handlers |
-| `audio-recorder.js` | Microphone capture | `startAudioRecorderWorklet()`, `convertFloat32ToPCM()` |
-| `audio-player.js` | Audio playback | `startAudioPlayerWorklet()` |
-| `pcm-recorder-processor.js` | AudioWorklet for capture | `PCMProcessor.process()` |
-| `pcm-player-processor.js` | AudioWorklet for playback | `PCMPlayerProcessor.process()`, `_enqueue()` |
-
-### Server Files Reference
-
-| File | Purpose | Key Functions |
-|------|---------|---------------|
-| `main.py` | FastAPI application | `websocket_endpoint()`, `upstream_task()`, `downstream_task()` |
-| `agent.py` | Agent definition | `Agent()` configuration |
-
-### Audio Format Summary
-
-| Direction | Sample Rate | Format | Channels | Transmission |
-|-----------|-------------|--------|----------|--------------|
-| Client → Server | 16 kHz | 16-bit PCM (Int16) | Mono | Binary WebSocket frame |
-| Server → Client | 24 kHz | 16-bit PCM (Base64) | Mono | JSON in text frame |
-
-### Message Format Reference
-
-**Text Message (Client → Server):**
-```json
-{"type": "text", "text": "Hello, how are you?"}
-```
-
-**Image Message (Client → Server):**
-```json
-{"type": "image", "data": "<base64>", "mimeType": "image/jpeg"}
-```
-
-**Audio (Client → Server):**
-Binary WebSocket frame containing raw PCM bytes (no JSON wrapper)
-
-**ADK Event (Server → Client):**
-```json
-{
-  "content": {"parts": [{"text": "I'm doing well!"}]},
-  "author": "agent",
-  "turnComplete": false
-}
-```
-
-**Transcription Event (Server → Client):**
-```json
-{
-  "inputTranscription": {"text": "Hello", "finished": true},
-  "author": "user"
-}
+# For Google AI Studio (alternative)
+GOOGLE_API_KEY=your_google_ai_studio_api_key
 ```
