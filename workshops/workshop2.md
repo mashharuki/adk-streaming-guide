@@ -1,5 +1,96 @@
 # ADK Bidi-streaming Workshop: Build Your Own Real-Time Voice AI
 
+## What is Bidi-streaming?
+
+**Bidirectional streaming** (bidi-streaming) enables simultaneous two-way communication between your application and AI models. Unlike traditional request-response patterns where you send a complete message and wait for a complete reply, bidi-streaming allows:
+
+- **Continuous input**: Stream audio, video, or text as it's captured
+- **Real-time output**: Receive AI responses as they're generated
+- **Natural interruption**: Users can interrupt the AI mid-response, just like in human conversation
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant App
+    participant AI
+
+    Note over User,AI: Traditional Request-Response
+    User->>App: Complete message
+    App->>AI: Send request
+    AI-->>App: Wait for full response...
+    App-->>User: Display response
+
+    Note over User,AI: Bidirectional Streaming
+    User->>App: Start speaking...
+    App->>AI: Stream audio chunks
+    AI-->>App: Stream response tokens
+    App-->>User: Play audio immediately
+    User->>App: [Interrupts!]
+    AI-->>App: [Stops immediately]
+```
+
+**Why this matters:** Bidi-streaming makes AI conversations feel natural. The AI can respond while you're still providing context, and you can interrupt it when you've heard enough—just like talking to a human.
+
+### What is ADK Bidi-streaming?
+
+The **Agent Development Kit (ADK)** provides a high-level abstraction over the Gemini Live API, handling the complex plumbing of real-time streaming so you can focus on building your application.
+
+![ADK abstracts away the complexity of Live API communication](assets/bidi_plumbing.webp)
+
+ADK Bidi-streaming manages:
+
+- **Connection lifecycle**: Establishing, maintaining, and recovering WebSocket connections
+- **Message routing**: Directing audio, text, and images to the right handlers
+- **Session state**: Persisting conversation history across reconnections
+- **Tool execution**: Automatically calling and resuming from function calls
+
+### Real-World Use Cases
+
+- **Customer Service**: A customer shows their defective coffee machine via phone camera while explaining the issue. The AI identifies the model and failure point, and the customer can interrupt to correct details mid-conversation.
+
+- **E-commerce**: A shopper holds up clothing to their webcam asking "Find shoes that match these pants." The agent analyzes the style and engages in fluid back-and-forth: "Show me something more casual" → "How about these sneakers?" → "Add the blue ones in size 10."
+
+- **Field Service**: A technician wearing smart glasses streams their view while asking "I'm hearing a strange noise from this compressor—can you identify it?" The agent provides step-by-step guidance hands-free.
+
+- **Healthcare**: A patient shares a live video of a skin condition. The AI performs preliminary analysis, asks clarifying questions, and guides next steps.
+
+- **Financial Services**: A client reviews their portfolio while the agent displays charts and simulates trade impacts. The client can share their screen to discuss specific news articles.
+
+**Shopper's Concierge 2 Demo**: Real-time Agentic RAG demo for e-commerce, built with ADK Bidi-streaming and Vertex AI Vector Search, Embeddings, Feature Store and Ranking API:
+
+[![Shopper's Concierge 2 Demo](https://img.youtube.com/vi/Hwx94smxT_0/maxresdefault.jpg)](https://www.youtube.com/watch?v=Hwx94smxT_0)
+
+### Learn More: Developer Guide
+
+For a comprehensive deep-dive, see the [ADK Bidi-streaming Developer Guide](https://google.github.io/adk-docs/streaming/dev-guide/part1/)—a 5-part series covering architecture to production deployment:
+
+| Part | Focus | What You'll Learn |
+|------|-------|-------------------|
+| [Part 1](https://google.github.io/adk-docs/streaming/dev-guide/part1/) | Foundation | Architecture, Live API platforms, 4-phase lifecycle |
+| [Part 2](https://google.github.io/adk-docs/streaming/dev-guide/part2/) | Upstream | Sending text, audio, video via LiveRequestQueue |
+| [Part 3](https://google.github.io/adk-docs/streaming/dev-guide/part3/) | Downstream | Event handling, tool execution, multi-agent workflows |
+| [Part 4](https://google.github.io/adk-docs/streaming/dev-guide/part4/) | Configuration | Session management, quotas, production controls |
+| [Part 5](https://google.github.io/adk-docs/streaming/dev-guide/part5/) | Multimodal | Audio specs, model architectures, advanced features |
+
+### Model Architectures
+
+Two fundamentally different architectures power voice AI in the Live API:
+
+**Native Audio models** process audio end-to-end without text intermediates. They produce more natural prosody, support an extended voice library, and enable advanced features like affective dialog (emotional adaptation) and proactivity (model-initiated responses). The current model is `gemini-live-2.5-flash-native-audio`.
+
+**Half-Cascade models** convert audio to text, process it, then synthesize speech. They support both TEXT and AUDIO response modalities, offering faster text responses and more predictable tool execution. The model `gemini-2.0-flash-live-001` was deprecated in December 2025.
+
+| Feature | Native Audio | Half-Cascade |
+|---------|--------------|--------------|
+| Response modalities | AUDIO only | TEXT or AUDIO |
+| Speech quality | More natural prosody | Standard TTS |
+| Advanced features | Affective dialog, proactivity | Limited |
+| Tool execution | Works but less predictable | More reliable |
+
+> **Choosing the right model:** For natural conversation with emotional awareness, use native audio. For applications prioritizing tool execution reliability or needing text output, test thoroughly with native audio before committing.
+
+---
+
 ## Workshop Overview
 
 ### What You'll Build
@@ -232,6 +323,53 @@ bidi-workshop/
 | `pcm-player-processor.js` | AudioWorklet processor with ring buffer for smooth playback |
 
 **Key insight:** The Python backend (what you'll build) handles ADK integration. The JavaScript frontend (pre-downloaded) handles browser APIs for audio/video. They communicate via WebSocket.
+
+---
+
+## Architecture Overview
+
+Before diving into code, let's understand the high-level architecture and lifecycle of a bidi-streaming application.
+
+### High-Level Architecture
+
+![High-Level Architecture of ADK Bidi-streaming](assets/Bidi_arch.jpeg)
+
+The architecture consists of three main layers:
+
+| Layer | Components | Purpose |
+|-------|------------|---------|
+| **Client** | Browser, WebSocket, AudioWorklet | Captures input, plays audio, displays UI |
+| **Server** | FastAPI, ADK Runner, LiveRequestQueue | Routes messages, manages sessions, orchestrates agent |
+| **AI** | Gemini Live API, Agent, Tools | Processes input, generates responses, executes tools |
+
+### The 4-Phase Lifecycle
+
+Every bidi-streaming session follows this lifecycle:
+
+![4-Phase Application Lifecycle](assets/app_lifecycle.png)
+
+| Phase | When | What Happens |
+|-------|------|--------------|
+| **1. Application Init** | Server startup | Create Agent, SessionService, Runner (once, shared) |
+| **2. Session Init** | WebSocket connects | Create RunConfig, get/create Session, create LiveRequestQueue |
+| **3. Bidi-streaming** | Active conversation | Concurrent upstream (input) and downstream (events) tasks |
+| **4. Termination** | Connection closes | Close LiveRequestQueue, cleanup resources |
+
+This lifecycle pattern is fundamental to all streaming applications. You'll implement each phase as you build through the steps.
+
+### LiveRequestQueue: The Input Channel
+
+The `LiveRequestQueue` is your primary interface for sending input to the model:
+
+![LiveRequestQueue Methods](assets/live_req_queue.png)
+
+| Method | Use Case | Triggers Response? |
+|--------|----------|-------------------|
+| `send_content(content)` | Text messages | Yes, immediately |
+| `send_realtime(blob)` | Audio/image streams | After VAD detects silence |
+| `send_activity_start()` | Signal user is active | No |
+| `send_activity_end()` | Signal user stopped | May trigger response |
+| `close()` | End the session | N/A |
 
 ---
 
@@ -726,6 +864,24 @@ run_config = RunConfig(
 | `input_audio_transcription` | Transcribe user speech to text |
 | `output_audio_transcription` | Transcribe model audio to text |
 
+![RunConfig Configuration Options](assets/runconfig.png)
+
+**Additional RunConfig options for production:**
+
+| Parameter | Purpose |
+|-----------|---------|
+| `speech_config` | Configure voice selection and speaking style |
+| `proactivity` | Enable model-initiated responses (native audio only) |
+| `session_resumption` | Enable automatic reconnection after WebSocket timeouts |
+| `context_window_compression` | Remove session duration limits |
+
+**Understanding Session Types:**
+
+One concept trips up many developers: ADK Session vs Live API session.
+
+- **ADK Session**: Persistent, lives in SessionService, survives restarts. User returns days later with history intact.
+- **Live API session**: Ephemeral, exists only during active `run_live()`. When the loop ends, it's destroyed—but ADK has already persisted the events.
+
 ### Understand LiveRequestQueue
 
 ```python
@@ -1094,6 +1250,25 @@ async for event in runner.run_live(
 | Turn complete | `event.turn_complete` | Model finished responding |
 | Interrupted | `event.interrupted` | User interrupted model |
 
+![Comprehensive Summary of ADK Live Event Handling](assets/run_live.png)
+
+### The Event Console
+
+The demo application includes an Event Console (right panel) that displays raw events as they arrive. This is invaluable for debugging and understanding the streaming flow.
+
+| Icon | Event Type | Description |
+|------|------------|-------------|
+| 📝 | Text content | Model's text response chunks |
+| 🔊 | Audio content | Model's audio response chunks |
+| 🎤 | Input transcription | User's speech converted to text |
+| 📜 | Output transcription | Model's audio converted to text |
+| 🛠️ | Tool call | Model requesting to use a tool |
+| ✅ | Tool response | Result from tool execution |
+| ⏹️ | Turn complete | Model finished responding |
+| ⚡ | Interrupted | User interrupted the model |
+
+Watch the Event Console as you interact—you'll see exactly how events flow in a streaming conversation.
+
 ### Client Code: Receiving and Processing Events
 
 The client handles all incoming events in `websocket.onmessage`:
@@ -1163,6 +1338,41 @@ Event 4: {"turnComplete": true}                          → Done!
 ```
 
 Each event appends text to the same bubble, creating the "typing" effect.
+
+### Example: Complete Voice Search Flow
+
+Let's trace a complete interaction to see how all the pieces work together. A user asks: *"What's the weather in Tokyo?"*
+
+```
+1. Audio Capture → Queue
+   Browser captures microphone at 16kHz, converts to PCM chunks.
+   Server receives binary frames and calls:
+   live_request_queue.send_realtime(audio_blob)
+
+2. VAD Detection
+   Live API's Voice Activity Detection notices user stopped speaking.
+   Triggers processing of accumulated audio.
+
+3. Transcription Event
+   Event arrives: input_transcription.text = "What's the weather in Tokyo?"
+   Display in chat UI so users see their words recognized.
+
+4. Tool Execution
+   Model decides to call google_search tool.
+   Tool call event arrives → ADK executes automatically → Tool response event follows.
+
+5. Audio Response
+   Model generates spoken response.
+   Audio chunks arrive as events with inline_data.
+   Client feeds them to AudioWorklet for playback:
+   "The weather in Tokyo is currently 22 degrees and sunny."
+
+6. Turn Complete
+   Event arrives with turn_complete=True.
+   UI removes "..." indicator—agent finished talking.
+```
+
+This entire flow takes under two seconds. The user experiences natural conversation, unaware of the LiveRequestQueue, Events, and session management happening beneath the surface.
 
 ---
 
@@ -1313,9 +1523,17 @@ You should see your speech transcribed in the chat (if using a model with transc
 
 **Checkpoint**: Bidirectional voice streaming working!
 
+### Multimodal Capabilities
+
+ADK Bidi-streaming supports audio, images, and video through the same streaming interface.
+
+![Comprehensive Summary of ADK Live API Multimodal Capabilities](assets/multimodal.png)
+
 ### Understand Audio Format
 
-The Live API requires specific audio format:
+The Live API has specific requirements for audio input and output:
+
+**Input Audio (microphone → model):**
 
 | Property | Value |
 |----------|-------|
@@ -1323,8 +1541,18 @@ The Live API requires specific audio format:
 | Sample rate | 16 kHz |
 | Channels | Mono |
 | MIME type | `audio/pcm;rate=16000` |
+| Chunk size | 50-100ms recommended (1,600-3,200 bytes) |
 
-The frontend's AudioWorklet handles format conversion automatically.
+**Output Audio (model → speakers):**
+
+| Property | Value |
+|----------|-------|
+| Format | 16-bit signed PCM |
+| Sample rate | 24 kHz |
+| Channels | Mono |
+| Delivery | Streamed as `inline_data` in events |
+
+The frontend's AudioWorklet handles format conversion automatically. The browser captures at 16kHz for input, and the player expects 24kHz for output.
 
 ### send_content() vs send_realtime()
 
@@ -1893,9 +2121,90 @@ finally:
     live_request_queue.close()
 ```
 
+### Why ADK Over Raw Live API?
+
+Now that you've built a complete streaming application, here's what ADK saved you from implementing yourself:
+
+![Raw Live API vs. ADK Bidi-streaming](assets/live_vs_adk.png)
+
+| Capability | Raw Live API | ADK Bidi-streaming |
+|------------|--------------|-------------------|
+| Agent Framework | Build from scratch | Single/multi-agent with tools, evaluation, security |
+| Tool Execution | Manual handling | Automatic parallel execution |
+| Connection Management | Manual reconnection | Transparent session resumption |
+| Event Model | Custom structures | Unified, typed Event objects |
+| Async Framework | Manual coordination | LiveRequestQueue + run_live() generator |
+| Session Persistence | Manual implementation | Built-in SQL, Vertex AI, or in-memory |
+
+> **The bottom line:** ADK reduces months of infrastructure development to days of application development. You focus on what your agent does, not how streaming works.
+
+### Resources
+
+| Resource | URL |
+|----------|-----|
+| ADK Documentation | https://google.github.io/adk-docs/ |
+| ADK Bidi-streaming Guide | https://google.github.io/adk-docs/streaming/dev-guide/ |
+| Gemini Live API | https://ai.google.dev/gemini-api/docs/live |
+| Vertex AI Live API | https://cloud.google.com/vertex-ai/generative-ai/docs/live-api |
+| ADK Samples Repository | https://github.com/google/adk-samples |
+
 ### Next Steps
 
 1. **Read the full guide**: https://google.github.io/adk-docs/streaming/dev-guide/
 2. **Explore multi-agent**: Create agents that hand off conversations
 3. **Deploy to Cloud Run**: Scale your streaming app
 4. **Add session resumption**: Handle disconnections gracefully
+5. **Add custom tools**: Build tools that integrate with your backend services
+
+---
+
+## Appendix: Troubleshooting
+
+### Common Issues and Solutions
+
+| Issue | Possible Cause | Solution |
+|-------|---------------|----------|
+| Microphone not working | Browser permissions | Check site permissions, ensure HTTPS or localhost |
+| No audio response | Wrong model or modality | Verify native audio model, check `response_modalities=["AUDIO"]` |
+| API key errors | Missing or invalid key | Check `.env` file, verify credentials are set correctly |
+| WebSocket disconnects | Session timeout or error | Check server logs, implement reconnection logic |
+| Slow responses | Network latency | Check connection, consider closer region |
+| "Model not found" | Invalid model name | Check model name spelling, verify availability |
+
+### Debugging Tips
+
+**Enable Debug Logging:**
+
+```python
+import logging
+logging.basicConfig(level=logging.DEBUG)
+```
+
+**Check Server Logs:**
+
+Look for events in the terminal:
+
+```
+[UPSTREAM] User text: Hello
+[DOWNSTREAM] Event: {"content": {"parts": [{"text": "Hi there!"}]}}
+```
+
+**Verify WebSocket Connection:**
+
+Open browser DevTools → Network → WS tab to see WebSocket frames.
+
+**Verify Audio Format:**
+
+Ensure audio is 16kHz mono PCM for input and expect 24kHz mono PCM for output.
+
+### Environment Variables Reference
+
+```bash
+# For Vertex AI (recommended for Cloud Shell)
+GOOGLE_CLOUD_PROJECT=your_project_id
+GOOGLE_CLOUD_LOCATION=us-central1
+GOOGLE_GENAI_USE_VERTEXAI=TRUE
+
+# For Google AI Studio (alternative)
+GOOGLE_API_KEY=your_google_ai_studio_api_key
+```
