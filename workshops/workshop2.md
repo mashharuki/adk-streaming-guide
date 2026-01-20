@@ -1581,56 +1581,162 @@ The buffer absorbs timing variations between network arrival and audio playback,
 
 Let's add camera/image support for multimodal AI.
 
-### Update Upstream Task
+### Update main.py
 
-Add image handling:
+Replace `app/main.py` with:
 
 ```python
-import base64  # Add to imports at top
+"""Step 8: Add image input for multimodal AI."""
 
-async def upstream_task() -> None:
-    """Receives messages from WebSocket and sends to LiveRequestQueue."""
-    while True:
-        message = await websocket.receive()
+import asyncio
+import base64
+import json
+import warnings
+from pathlib import Path
 
-        if "text" in message:
-            json_message = json.loads(message["text"])
+from dotenv import load_dotenv
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
+from google.adk.agents.live_request_queue import LiveRequestQueue
+from google.adk.agents.run_config import RunConfig, StreamingMode
+from google.adk.runners import Runner
+from google.adk.sessions import InMemorySessionService
+from google.genai import types
 
-            # Handle text messages
-            if json_message.get("type") == "text":
-                user_text = json_message["text"]
-                print(f"[UPSTREAM] Text: {user_text}")
+# Suppress noisy warnings
+warnings.filterwarnings("ignore", message="Your application has authenticated using end user credentials")
+warnings.filterwarnings("ignore", category=UserWarning, module="pydantic")
 
-                content = types.Content(
-                    parts=[types.Part(text=user_text)]
+load_dotenv(Path(__file__).parent / ".env")
+
+from my_agent.agent import agent  # noqa: E402
+
+APP_NAME = "bidi-workshop"
+
+app = FastAPI()
+static_dir = Path(__file__).parent / "static"
+app.mount("/static", StaticFiles(directory=static_dir), name="static")
+
+session_service = InMemorySessionService()
+runner = Runner(app_name=APP_NAME, agent=agent, session_service=session_service)
+
+
+@app.get("/")
+async def root():
+    return FileResponse(Path(__file__).parent / "static" / "index.html")
+
+
+@app.websocket("/ws/{user_id}/{session_id}")
+async def websocket_endpoint(
+    websocket: WebSocket,
+    user_id: str,
+    session_id: str,
+) -> None:
+    await websocket.accept()
+    print("Connection open")
+
+    run_config = RunConfig(
+        streaming_mode=StreamingMode.BIDI,
+        response_modalities=["AUDIO"],
+        input_audio_transcription=types.AudioTranscriptionConfig(),
+        output_audio_transcription=types.AudioTranscriptionConfig(),
+    )
+
+    session = await session_service.get_session(
+        app_name=APP_NAME, user_id=user_id, session_id=session_id
+    )
+    if not session:
+        await session_service.create_session(
+            app_name=APP_NAME, user_id=user_id, session_id=session_id
+        )
+
+    live_request_queue = LiveRequestQueue()
+
+    async def upstream_task() -> None:
+        """Receives messages from WebSocket and sends to LiveRequestQueue."""
+        while True:
+            message = await websocket.receive()
+
+            # Handle text messages (JSON)
+            if "text" in message:
+                json_message = json.loads(message["text"])
+
+                # Handle text messages
+                if json_message.get("type") == "text":
+                    user_text = json_message["text"]
+                    print(f"[UPSTREAM] Text: {user_text}")
+
+                    content = types.Content(
+                        parts=[types.Part(text=user_text)]
+                    )
+                    live_request_queue.send_content(content)
+
+                # Handle image messages
+                elif json_message.get("type") == "image":
+                    print("[UPSTREAM] Image received")
+
+                    # Decode base64 image data
+                    image_data = base64.b64decode(json_message["data"])
+                    mime_type = json_message.get("mimeType", "image/jpeg")
+
+                    print(f"[UPSTREAM] Image: {len(image_data)} bytes, {mime_type}")
+
+                    # Create image blob and send
+                    image_blob = types.Blob(
+                        mime_type=mime_type,
+                        data=image_data
+                    )
+                    live_request_queue.send_realtime(image_blob)
+
+            # Handle binary messages (audio)
+            elif "bytes" in message:
+                audio_data = message["bytes"]
+                print(f"[UPSTREAM] Audio chunk: {len(audio_data)} bytes")
+
+                audio_blob = types.Blob(
+                    mime_type="audio/pcm;rate=16000",
+                    data=audio_data
                 )
-                live_request_queue.send_content(content)
+                live_request_queue.send_realtime(audio_blob)
 
-            # Handle image messages
-            elif json_message.get("type") == "image":
-                print("[UPSTREAM] Image received")
+    async def downstream_task() -> None:
+        """Receives Events from run_live() and sends to WebSocket."""
+        print("[DOWNSTREAM] Starting run_live()")
 
-                # Decode base64 image data
-                image_data = base64.b64decode(json_message["data"])
-                mime_type = json_message.get("mimeType", "image/jpeg")
+        async for event in runner.run_live(
+            user_id=user_id,
+            session_id=session_id,
+            live_request_queue=live_request_queue,
+            run_config=run_config,
+        ):
+            event_json = event.model_dump_json(exclude_none=True, by_alias=True)
+            print(f"[DOWNSTREAM] Event: {event_json[:100]}...")
+            await websocket.send_text(event_json)
 
-                print(f"[UPSTREAM] Image: {len(image_data)} bytes, {mime_type}")
+        print("[DOWNSTREAM] run_live() completed")
 
-                # Create image blob and send
-                image_blob = types.Blob(
-                    mime_type=mime_type,
-                    data=image_data
-                )
-                live_request_queue.send_realtime(image_blob)
-
-        elif "bytes" in message:
-            audio_data = message["bytes"]
-            audio_blob = types.Blob(
-                mime_type="audio/pcm;rate=16000",
-                data=audio_data
-            )
-            live_request_queue.send_realtime(audio_blob)
+    try:
+        await asyncio.gather(upstream_task(), downstream_task())
+    except WebSocketDisconnect:
+        print("Client disconnected")
+    except Exception as e:
+        print(f"Error: {e}")
+    finally:
+        live_request_queue.close()
+        print("Connection closed")
 ```
+
+### Test Image Input
+
+After the server reloads:
+
+1. Click the camera button
+2. Allow camera access
+3. Capture an image
+4. Ask "What do you see in this image?"
+
+**Checkpoint**: Multimodal AI working!
 
 ### Understand Image Format
 
@@ -1742,291 +1848,6 @@ For images sent infrequently (on user action), base64 overhead is acceptable. Th
 [raw PCM bytes]
 ```
 
-### Test Image Input
-
-After the server reloads:
-
-1. Click the camera button
-2. Allow camera access
-3. Capture an image
-4. Ask "What do you see in this image?"
-
-**Checkpoint**: Multimodal AI working!
-
----
-
-## Step 9: Production Polish (10 min)
-
-Let's add proper error handling and logging.
-
-### Complete main.py
-
-Here's the complete, production-ready version:
-
-```python
-"""Complete ADK Bidi-streaming server with all features."""
-
-import asyncio
-import base64
-import json
-import logging
-from pathlib import Path
-
-from dotenv import load_dotenv
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse
-from fastapi.staticfiles import StaticFiles
-from google.adk.agents.live_request_queue import LiveRequestQueue
-from google.adk.agents.run_config import RunConfig, StreamingMode
-from google.adk.runners import Runner
-from google.adk.sessions import InMemorySessionService
-from google.genai import types
-
-# Load environment variables
-load_dotenv(Path(__file__).parent / ".env")
-
-from my_agent.agent import agent  # noqa: E402
-
-# Configure logging
-logging.basicConfig(
-    level=logging.DEBUG,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-)
-logger = logging.getLogger(__name__)
-
-# ========================================
-# Phase 1: Application Initialization
-# ========================================
-
-APP_NAME = "bidi-workshop"
-
-app = FastAPI()
-static_dir = Path(__file__).parent / "static"
-app.mount("/static", StaticFiles(directory=static_dir), name="static")
-
-session_service = InMemorySessionService()
-runner = Runner(app_name=APP_NAME, agent=agent, session_service=session_service)
-
-logger.info(f"Application initialized with model: {agent.model}")
-
-
-@app.get("/")
-async def root():
-    return FileResponse(Path(__file__).parent / "static" / "index.html")
-
-
-@app.websocket("/ws/{user_id}/{session_id}")
-async def websocket_endpoint(
-    websocket: WebSocket,
-    user_id: str,
-    session_id: str,
-    proactivity: bool = False,
-    affective_dialog: bool = False,
-) -> None:
-    """WebSocket endpoint for bidirectional streaming."""
-    await websocket.accept()
-    logger.info(f"Client connected: user={user_id}, session={session_id}")
-
-    # ========================================
-    # Phase 2: Session Initialization
-    # ========================================
-
-    model_name = agent.model
-    is_native_audio = "native-audio" in model_name.lower()
-
-    if is_native_audio:
-        run_config = RunConfig(
-            streaming_mode=StreamingMode.BIDI,
-            response_modalities=["AUDIO"],
-            input_audio_transcription=types.AudioTranscriptionConfig(),
-            output_audio_transcription=types.AudioTranscriptionConfig(),
-            proactivity=(
-                types.ProactivityConfig(proactive_audio=True)
-                if proactivity else None
-            ),
-            enable_affective_dialog=affective_dialog if affective_dialog else None,
-        )
-    else:
-        run_config = RunConfig(
-            streaming_mode=StreamingMode.BIDI,
-            response_modalities=["TEXT"],
-        )
-
-    session = await session_service.get_session(
-        app_name=APP_NAME, user_id=user_id, session_id=session_id
-    )
-    if not session:
-        await session_service.create_session(
-            app_name=APP_NAME, user_id=user_id, session_id=session_id
-        )
-
-    live_request_queue = LiveRequestQueue()
-
-    # ========================================
-    # Phase 3: Bidirectional Streaming
-    # ========================================
-
-    async def upstream_task() -> None:
-        """Receives messages from WebSocket and sends to LiveRequestQueue."""
-        logger.debug("Upstream task started")
-
-        while True:
-            message = await websocket.receive()
-
-            if "text" in message:
-                json_message = json.loads(message["text"])
-
-                if json_message.get("type") == "text":
-                    user_text = json_message["text"]
-                    logger.debug(f"Text input: {user_text}")
-
-                    content = types.Content(
-                        parts=[types.Part(text=user_text)]
-                    )
-                    live_request_queue.send_content(content)
-
-                elif json_message.get("type") == "image":
-                    image_data = base64.b64decode(json_message["data"])
-                    mime_type = json_message.get("mimeType", "image/jpeg")
-                    logger.debug(f"Image input: {len(image_data)} bytes")
-
-                    image_blob = types.Blob(mime_type=mime_type, data=image_data)
-                    live_request_queue.send_realtime(image_blob)
-
-            elif "bytes" in message:
-                audio_data = message["bytes"]
-                audio_blob = types.Blob(
-                    mime_type="audio/pcm;rate=16000",
-                    data=audio_data
-                )
-                live_request_queue.send_realtime(audio_blob)
-
-    async def downstream_task() -> None:
-        """Receives Events from run_live() and sends to WebSocket."""
-        logger.debug("Downstream task started")
-
-        async for event in runner.run_live(
-            user_id=user_id,
-            session_id=session_id,
-            live_request_queue=live_request_queue,
-            run_config=run_config,
-        ):
-            event_json = event.model_dump_json(exclude_none=True, by_alias=True)
-            logger.debug(f"Event: {event_json[:100]}...")
-            await websocket.send_text(event_json)
-
-    try:
-        await asyncio.gather(upstream_task(), downstream_task())
-    except WebSocketDisconnect:
-        logger.info("Client disconnected normally")
-    except Exception as e:
-        logger.error(f"Error in streaming: {e}", exc_info=True)
-    finally:
-        # ========================================
-        # Phase 4: Termination
-        # ========================================
-        live_request_queue.close()
-        logger.info("Session terminated, queue closed")
-```
-
-### Key Production Patterns
-
-1. **Always close the queue in `finally`**:
-   ```python
-   finally:
-       live_request_queue.close()
-   ```
-
-2. **Use logging instead of print**:
-   ```python
-   logger.debug(f"Event: {event_json}")
-   ```
-
-3. **Handle exceptions gracefully**:
-   ```python
-   except WebSocketDisconnect:
-       logger.info("Normal disconnect")
-   except Exception as e:
-       logger.error(f"Error: {e}", exc_info=True)
-   ```
-
-4. **Auto-detect model capabilities**:
-   ```python
-   is_native_audio = "native-audio" in model_name.lower()
-   ```
-
-**Checkpoint**: Production-ready streaming server!
-
----
-
-## Bonus Challenges (Optional)
-
-### Challenge 1: Add a Custom Tool
-
-Create a tool that returns the current time:
-
-```python
-# In my_agent/agent.py
-from datetime import datetime
-
-def get_current_time(timezone: str = "UTC") -> str:
-    """Get the current time.
-
-    Args:
-        timezone: Timezone name (e.g., "America/New_York")
-
-    Returns:
-        Current time as a formatted string
-    """
-    try:
-        import pytz
-        tz = pytz.timezone(timezone)
-        now = datetime.now(tz)
-        return f"The time in {timezone} is {now.strftime('%I:%M %p')}"
-    except Exception:
-        return f"Current UTC time is {datetime.utcnow().strftime('%I:%M %p')}"
-
-agent = Agent(
-    name="workshop_agent",
-    model=os.getenv("DEMO_AGENT_MODEL", "gemini-2.0-flash-exp"),
-    instruction="You are a helpful assistant with access to time and search.",
-    tools=[google_search, get_current_time],
-)
-```
-
-Test it: "What time is it in Tokyo?"
-
-### Challenge 2: Change the Voice
-
-Add voice configuration to RunConfig:
-
-```python
-run_config = RunConfig(
-    streaming_mode=StreamingMode.BIDI,
-    response_modalities=["AUDIO"],
-    speech_config=types.SpeechConfig(
-        voice_config=types.VoiceConfig(
-            prebuilt_voice_config=types.PrebuiltVoiceConfig(
-                voice_name="Kore"  # Try: Puck, Charon, Fenrir, Aoede
-            )
-        )
-    ),
-)
-```
-
-### Challenge 3: Enable Interruption Handling
-
-The model already supports interruptions, but you can add UI feedback:
-
-```python
-async for event in runner.run_live(...):
-    if event.interrupted:
-        logger.info("User interrupted the model")
-        # Could send a special event to the client
-
-    # ... rest of event handling
-```
-
 ---
 
 ## Wrap-up & Key Takeaways
@@ -2078,121 +1899,3 @@ finally:
 2. **Explore multi-agent**: Create agents that hand off conversations
 3. **Deploy to Cloud Run**: Scale your streaming app
 4. **Add session resumption**: Handle disconnections gracefully
-
----
-
-## Appendix A: Complete File Listings
-
-### app/main.py (Complete)
-
-See Section 11.1 for the complete production-ready version.
-
-### app/my_agent/agent.py (Complete)
-
-```python
-"""Agent definition for the bidi-workshop."""
-
-import os
-
-from google.adk.agents import Agent
-from google.adk.tools import google_search
-
-agent = Agent(
-    name="workshop_agent",
-    model=os.getenv("DEMO_AGENT_MODEL", "gemini-2.0-flash-exp"),
-    instruction="""You are a helpful AI assistant.
-
-    You can use Google Search to find current information.
-    Keep your responses concise and friendly.
-    """,
-    tools=[google_search],
-)
-```
-
-### app/.env (Template)
-
-```bash
-GOOGLE_CLOUD_PROJECT=your_project_id
-GOOGLE_CLOUD_LOCATION=us-central1
-GOOGLE_GENAI_USE_VERTEXAI=TRUE
-```
-
-### pyproject.toml (Complete)
-
-```toml
-[project]
-name = "bidi-workshop"
-version = "0.1.0"
-requires-python = ">=3.10"
-dependencies = [
-    "google-adk>=1.22.1",
-    "fastapi>=0.115.0",
-    "uvicorn>=0.32.0",
-    "python-dotenv>=1.0.0",
-    "websockets>=13.0",
-]
-
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
-
-[tool.hatch.build.targets.wheel]
-packages = ["app"]
-```
-
----
-
-## Appendix B: Troubleshooting
-
-| Issue | Cause | Solution |
-|-------|-------|----------|
-| "Module not found: my_agent" | Import path issue | Ensure `__init__.py` exists in `my_agent/` |
-| No audio response | Wrong modality | Set `response_modalities=["AUDIO"]` |
-| Microphone not working | Permissions | Check browser permissions, use HTTPS/localhost |
-| WebSocket disconnects | Session timeout | Add session_resumption to RunConfig |
-| "Model not found" | Invalid model name | Check spelling, verify model availability |
-| Events not streaming | Missing run_live() | Ensure downstream_task calls runner.run_live() |
-
-### Debug Logging
-
-Enable detailed logging:
-
-```python
-logging.basicConfig(level=logging.DEBUG)
-```
-
-Check WebSocket frames in browser DevTools → Network → WS tab.
-
----
-
-## Appendix C: Quick Reference
-
-### LiveRequestQueue Methods
-
-| Method | Input Type | Use Case |
-|--------|-----------|----------|
-| `send_content(content)` | `types.Content` | Text messages |
-| `send_realtime(blob)` | `types.Blob` | Audio, images, video |
-| `close()` | None | End session |
-
-### RunConfig Options
-
-| Option | Values | Purpose |
-|--------|--------|---------|
-| `streaming_mode` | `BIDI`, `SSE` | WebSocket or HTTP |
-| `response_modalities` | `["TEXT"]`, `["AUDIO"]` | Response type |
-| `input_audio_transcription` | `AudioTranscriptionConfig()` | Transcribe user |
-| `output_audio_transcription` | `AudioTranscriptionConfig()` | Transcribe model |
-| `proactivity` | `ProactivityConfig()` | Model initiates |
-| `enable_affective_dialog` | `True`/`False` | Emotional awareness |
-
-### Event Fields
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `event.content` | Content | Text or audio parts |
-| `event.input_transcription` | Transcription | User speech → text |
-| `event.output_transcription` | Transcription | Model speech → text |
-| `event.turn_complete` | bool | Model finished |
-| `event.interrupted` | bool | User interrupted |
-| `event.actions` | List | Tool calls |
