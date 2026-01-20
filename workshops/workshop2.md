@@ -133,7 +133,19 @@ Replace `your_project_id` with your Google Cloud project ID.
 
 > **Finding your Project ID**: Click the project dropdown in the Cloud Console header to see your project ID.
 
-**Step 5: Install Dependencies**
+**Step 5: Set Up Authentication**
+
+Configure Application Default Credentials (ADC) for Vertex AI access:
+
+```bash
+gcloud auth application-default login
+```
+
+Follow the prompts to authenticate. This creates credentials that ADK uses to access Vertex AI.
+
+> **Verify authentication**: Run `gcloud auth application-default print-access-token` to confirm credentials are configured.
+
+**Step 6: Install Dependencies**
 
 Now we'll install all the Python packages defined in pyproject.toml.
 
@@ -151,7 +163,7 @@ This installs the bidi-workshop package and all required dependencies including:
 - [`uvicorn`](https://www.uvicorn.org/) - ASGI server
 - [`python-dotenv`](https://pypi.org/project/python-dotenv/) - Environment variable management
 
-**Step 6: Download Frontend Assets**
+**Step 7: Download Frontend Assets**
 
 The frontend handles audio capture/playback using Web Audio APIs. Since this workshop focuses on ADK concepts, we'll use pre-built frontend files.
 
@@ -530,6 +542,14 @@ async def websocket_endpoint(
         print("Client disconnected")
 ```
 
+### Test Step 3
+
+No server restart needed - uvicorn's `--reload` flag automatically detects file changes.
+
+Send a message. You should see "ADK Ready! Model: gemini-live-2.5-flash-native-audio" in the chat.
+
+**Checkpoint**: ADK components initialized! The app is not ready for actual chat yet - we'll connect to the Live API in the next steps.
+
 ### Understand the Components
 
 ```python
@@ -563,14 +583,6 @@ const sessionId = "demo-session-" + Math.random().toString(36).substring(7);
 const ws_url = "ws://" + window.location.host + "/ws/" + userId + "/" + sessionId;
 ```
 
-### Test Step 3
-
-No server restart needed - uvicorn's `--reload` flag automatically detects file changes.
-
-Send a message. You should see "ADK Ready! Model: gemini-live-2.5-flash-native-audio" in the chat.
-
-**Checkpoint**: ADK components initialized! The app is not ready for actual chat yet - we'll connect to the Live API in the next steps.
-
 ---
 
 ## Step 4: Session Initialization (15 min)
@@ -595,6 +607,7 @@ from google.adk.agents.live_request_queue import LiveRequestQueue
 from google.adk.agents.run_config import RunConfig, StreamingMode
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
+from google.genai import types
 
 # Load environment variables BEFORE importing agent
 load_dotenv(Path(__file__).parent / ".env")
@@ -634,10 +647,13 @@ async def websocket_endpoint(
     # Phase 2: Session Initialization
     # ========================================
 
-    # Configure streaming behavior
+    # Configure streaming behavior for native audio model
+    # Native audio models ONLY support AUDIO response modality
     run_config = RunConfig(
         streaming_mode=StreamingMode.BIDI,  # Bidirectional streaming
-        response_modalities=["TEXT"],        # Model responds with text
+        response_modalities=["AUDIO"],       # Native audio models require AUDIO
+        input_audio_transcription=types.AudioTranscriptionConfig(),
+        output_audio_transcription=types.AudioTranscriptionConfig(),
     )
 
     # Get or create session for conversation history
@@ -669,10 +685,10 @@ async def websocket_endpoint(
                 text_data = message["text"]
                 print(f"Received: {text_data}")
 
-                # Placeholder - will add streaming in next step
+                # Placeholder - actual streaming will be added in Step 5 & 6
                 response = {
                     "content": {
-                        "parts": [{"text": "Session ready! Streaming coming next..."}]
+                        "parts": [{"text": "[Step 4 Complete] Session initialized. Proceed to Step 5 to enable model responses."}]
                     }
                 }
                 await websocket.send_text(json.dumps(response))
@@ -688,12 +704,20 @@ async def websocket_endpoint(
         print("LiveRequestQueue closed")
 ```
 
+### Test Step 4
+
+Restart and test. Open a second browser tab with the same URL.
+
+**Checkpoint**: Per-session resources created!
+
 ### Understand RunConfig
 
 ```python
 run_config = RunConfig(
     streaming_mode=StreamingMode.BIDI,  # WebSocket bidirectional
-    response_modalities=["TEXT"],        # TEXT for chat, AUDIO for voice
+    response_modalities=["AUDIO"],       # Native audio models require AUDIO
+    input_audio_transcription=types.AudioTranscriptionConfig(),
+    output_audio_transcription=types.AudioTranscriptionConfig(),
 )
 ```
 
@@ -702,9 +726,9 @@ run_config = RunConfig(
 | Parameter | Purpose |
 |-----------|---------|
 | `streaming_mode` | `BIDI` for WebSocket, `SSE` for HTTP |
-| `response_modalities` | `["TEXT"]` or `["AUDIO"]` |
-| `input_audio_transcription` | Enable speech-to-text for user |
-| `output_audio_transcription` | Enable speech-to-text for model |
+| `response_modalities` | `["AUDIO"]` for native audio models |
+| `input_audio_transcription` | Transcribe user speech to text |
+| `output_audio_transcription` | Transcribe model audio to text |
 
 ### Understand LiveRequestQueue
 
@@ -719,57 +743,6 @@ This is the **upstream channel** for sending input to the model:
 | `send_content(content)` | Text messages (triggers response) |
 | `send_realtime(blob)` | Audio/image chunks (streaming) |
 | `close()` | End the session |
-
-### Client Code: Passing RunConfig Options
-
-The client can influence RunConfig through query parameters:
-
-```javascript
-// app.js:37-55 - Build WebSocket URL with options
-function getWebSocketUrl() {
-    const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const baseUrl = wsProtocol + "//" + window.location.host + "/ws/" + userId + "/" + sessionId;
-    const params = new URLSearchParams();
-
-    // Pass RunConfig options as query parameters
-    if (enableProactivityCheckbox.checked) {
-        params.append("proactivity", "true");
-    }
-    if (enableAffectiveDialogCheckbox.checked) {
-        params.append("affective_dialog", "true");
-    }
-
-    const queryString = params.toString();
-    return queryString ? baseUrl + "?" + queryString : baseUrl;
-}
-```
-
-**Server receives these as endpoint parameters:**
-
-```python
-@app.websocket("/ws/{user_id}/{session_id}")
-async def websocket_endpoint(
-    websocket: WebSocket,
-    user_id: str,           # From URL path
-    session_id: str,        # From URL path
-    proactivity: bool = False,      # From query param ?proactivity=true
-    affective_dialog: bool = False, # From query param ?affective_dialog=true
-) -> None:
-```
-
-**Configuration flow:**
-
-```
-Client checkbox → Query param → FastAPI endpoint → RunConfig → Live API
-```
-
-This pattern lets users toggle features like proactivity without reconnecting—though changing RunConfig requires a new WebSocket connection.
-
-### Test Step 4
-
-Restart and test. Open a second browser tab with the same URL—notice both connect with different session IDs.
-
-**Checkpoint**: Per-session resources created!
 
 ---
 
@@ -828,7 +801,9 @@ async def websocket_endpoint(
     # Phase 2: Session Initialization
     run_config = RunConfig(
         streaming_mode=StreamingMode.BIDI,
-        response_modalities=["TEXT"],
+        response_modalities=["AUDIO"],
+        input_audio_transcription=types.AudioTranscriptionConfig(),
+        output_audio_transcription=types.AudioTranscriptionConfig(),
     )
 
     session = await session_service.get_session(
@@ -887,6 +862,18 @@ async def websocket_endpoint(
         live_request_queue.close()
         print("Session terminated")
 ```
+
+### Test Step 5
+
+Restart and send a message. Check the terminal—you should see:
+```
+User said: Hello
+Sent to LiveRequestQueue
+```
+
+The message goes to the model, but we're not receiving responses yet. That's next!
+
+**Checkpoint**: Upstream path working!
 
 ### Understand the Upstream Flow
 
@@ -959,18 +946,6 @@ User types → Form submit → JSON.stringify → WebSocket text frame
 
 The `type: "text"` field tells the server this is a text message (vs image or other types we'll add later).
 
-### Test Step 5
-
-Restart and send a message. Check the terminal—you should see:
-```
-User said: Hello
-Sent to LiveRequestQueue
-```
-
-The message goes to the model, but we're not receiving responses yet. That's next!
-
-**Checkpoint**: Upstream path working!
-
 ---
 
 ## Step 6: Downstream Task (15 min)
@@ -1027,7 +1002,9 @@ async def websocket_endpoint(
 
     run_config = RunConfig(
         streaming_mode=StreamingMode.BIDI,
-        response_modalities=["TEXT"],
+        response_modalities=["AUDIO"],
+        input_audio_transcription=types.AudioTranscriptionConfig(),
+        output_audio_transcription=types.AudioTranscriptionConfig(),
     )
 
     session = await session_service.get_session(
@@ -1085,6 +1062,18 @@ async def websocket_endpoint(
     finally:
         live_request_queue.close()
 ```
+
+### Test Step 6
+
+Restart and try:
+
+1. Type "Hello, who are you?"
+2. Watch the response stream in word by word!
+3. Try "Search for the weather in Tokyo"—watch tool execution!
+
+Open the Event Console (right panel) to see raw events.
+
+**Checkpoint**: Full bidirectional text streaming!
 
 ### Understand run_live()
 
@@ -1179,61 +1168,149 @@ Event 4: {"turnComplete": true}                          → Done!
 
 Each event appends text to the same bubble, creating the "typing" effect.
 
-### Test Step 6
-
-Restart and try:
-
-1. Type "Hello, who are you?"
-2. Watch the response stream in word by word!
-3. Try "Search for the weather in Tokyo"—watch tool execution!
-
-Open the Event Console (right panel) to see raw events.
-
-**Checkpoint**: Full bidirectional text streaming!
-
 ---
 
 ## Step 7: Add Audio Input (10 min)
 
 Let's add voice input support.
 
-### Update Upstream Task
+### Update main.py
 
-Add audio handling to the upstream task:
+Replace `app/main.py` with:
 
 ```python
-async def upstream_task() -> None:
-    """Receives messages from WebSocket and sends to LiveRequestQueue."""
-    while True:
-        message = await websocket.receive()
+"""Step 7: Audio input - receiving voice from the client."""
 
-        # Handle text messages (JSON)
-        if "text" in message:
-            json_message = json.loads(message["text"])
+import asyncio
+import json
+from pathlib import Path
 
-            if json_message.get("type") == "text":
-                user_text = json_message["text"]
-                print(f"[UPSTREAM] User text: {user_text}")
+from dotenv import load_dotenv
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
+from google.adk.agents.live_request_queue import LiveRequestQueue
+from google.adk.agents.run_config import RunConfig, StreamingMode
+from google.adk.runners import Runner
+from google.adk.sessions import InMemorySessionService
+from google.genai import types
 
-                content = types.Content(
-                    parts=[types.Part(text=user_text)]
+load_dotenv(Path(__file__).parent / ".env")
+
+from my_agent.agent import agent  # noqa: E402
+
+APP_NAME = "bidi-workshop"
+
+app = FastAPI()
+static_dir = Path(__file__).parent / "static"
+app.mount("/static", StaticFiles(directory=static_dir), name="static")
+
+session_service = InMemorySessionService()
+runner = Runner(app_name=APP_NAME, agent=agent, session_service=session_service)
+
+
+@app.get("/")
+async def root():
+    return FileResponse(Path(__file__).parent / "static" / "index.html")
+
+
+@app.websocket("/ws/{user_id}/{session_id}")
+async def websocket_endpoint(
+    websocket: WebSocket,
+    user_id: str,
+    session_id: str,
+) -> None:
+    await websocket.accept()
+    print("Connection open")
+
+    run_config = RunConfig(
+        streaming_mode=StreamingMode.BIDI,
+        response_modalities=["AUDIO"],
+        input_audio_transcription=types.AudioTranscriptionConfig(),
+        output_audio_transcription=types.AudioTranscriptionConfig(),
+    )
+
+    session = await session_service.get_session(
+        app_name=APP_NAME, user_id=user_id, session_id=session_id
+    )
+    if not session:
+        await session_service.create_session(
+            app_name=APP_NAME, user_id=user_id, session_id=session_id
+        )
+
+    live_request_queue = LiveRequestQueue()
+
+    async def upstream_task() -> None:
+        """Receives messages from WebSocket and sends to LiveRequestQueue."""
+        while True:
+            message = await websocket.receive()
+
+            # Handle text messages (JSON)
+            if "text" in message:
+                json_message = json.loads(message["text"])
+
+                if json_message.get("type") == "text":
+                    user_text = json_message["text"]
+                    print(f"[UPSTREAM] User text: {user_text}")
+
+                    content = types.Content(
+                        parts=[types.Part(text=user_text)]
+                    )
+                    live_request_queue.send_content(content)
+
+            # Handle binary messages (audio)
+            elif "bytes" in message:
+                audio_data = message["bytes"]
+                print(f"[UPSTREAM] Audio chunk: {len(audio_data)} bytes")
+
+                # Create audio blob with correct format
+                audio_blob = types.Blob(
+                    mime_type="audio/pcm;rate=16000",  # 16kHz mono PCM
+                    data=audio_data
                 )
-                live_request_queue.send_content(content)
 
-        # Handle binary messages (audio)
-        elif "bytes" in message:
-            audio_data = message["bytes"]
-            print(f"[UPSTREAM] Audio chunk: {len(audio_data)} bytes")
+                # Stream audio (doesn't trigger response until VAD detects silence)
+                live_request_queue.send_realtime(audio_blob)
 
-            # Create audio blob with correct format
-            audio_blob = types.Blob(
-                mime_type="audio/pcm;rate=16000",  # 16kHz mono PCM
-                data=audio_data
-            )
+    async def downstream_task() -> None:
+        """Receives Events from run_live() and sends to WebSocket."""
+        print("[DOWNSTREAM] Starting run_live()")
 
-            # Stream audio (doesn't trigger response until VAD detects silence)
-            live_request_queue.send_realtime(audio_blob)
+        async for event in runner.run_live(
+            user_id=user_id,
+            session_id=session_id,
+            live_request_queue=live_request_queue,
+            run_config=run_config,
+        ):
+            event_json = event.model_dump_json(exclude_none=True, by_alias=True)
+            print(f"[DOWNSTREAM] Event: {event_json[:100]}...")
+            await websocket.send_text(event_json)
+
+        print("[DOWNSTREAM] run_live() completed")
+
+    try:
+        await asyncio.gather(upstream_task(), downstream_task())
+    except WebSocketDisconnect:
+        print("Client disconnected")
+    except Exception as e:
+        print(f"Error: {e}")
+    finally:
+        live_request_queue.close()
+        print("Connection closed")
 ```
+
+### Test Step 7
+
+No server restart needed - uvicorn's `--reload` flag automatically detects file changes.
+
+1. Click "Start Audio" button
+2. Allow microphone access
+3. Speak "Hello, can you hear me?"
+4. Wait for the response
+
+You should see your speech transcribed in the chat (if using a model with transcription support).
+
+**Checkpoint**: Voice input working!
 
 ### Understand Audio Format
 
@@ -1354,19 +1431,6 @@ Microphone → MediaStream → AudioContext (16kHz resample)
 | `AudioWorklet` | Process audio on separate thread (no glitches) |
 | `Float32 → Int16` | Convert Web Audio format to PCM |
 | Binary WebSocket frame | More efficient than base64 encoding |
-
-### Test Audio Input
-
-No server restart needed - uvicorn's `--reload` flag automatically detects file changes.
-
-1. Click "Start Audio" button
-2. Allow microphone access
-3. Speak "Hello, can you hear me?"
-4. Wait for the response
-
-You should see your speech transcribed in the chat (if using a model with transcription support).
-
-**Checkpoint**: Voice input working!
 
 ---
 
@@ -2108,9 +2172,9 @@ agent = Agent(
 ### app/.env (Template)
 
 ```bash
-GOOGLE_API_KEY=your_api_key_here
-GOOGLE_GENAI_USE_VERTEXAI=FALSE
-DEMO_AGENT_MODEL=gemini-2.0-flash-exp
+GOOGLE_CLOUD_PROJECT=your_project_id
+GOOGLE_CLOUD_LOCATION=us-central1
+GOOGLE_GENAI_USE_VERTEXAI=TRUE
 ```
 
 ### pyproject.toml (Complete)
