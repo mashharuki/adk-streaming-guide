@@ -380,15 +380,13 @@ Create `app/my_agent/agent.py`:
 ```python
 """Agent definition for the bidi-workshop."""
 
-import os
-
 from google.adk.agents import Agent
 from google.adk.tools import google_search
 
 # Define the agent
 agent = Agent(
     name="workshop_agent",
-    model=os.getenv("DEMO_AGENT_MODEL", "gemini-2.0-flash-exp"),
+    model="gemini-live-2.5-flash-native-audio",
     instruction="""You are a helpful AI assistant.
 
     You can use Google Search to find current information.
@@ -397,18 +395,6 @@ agent = Agent(
     tools=[google_search],
 )
 ```
-
-### Update .env
-
-Update `app/.env` to use a model that supports bidi-streaming:
-
-```bash
-GOOGLE_API_KEY=your_api_key_here
-GOOGLE_GENAI_USE_VERTEXAI=FALSE
-DEMO_AGENT_MODEL=gemini-2.0-flash-exp
-```
-
-> **Model Selection**: `gemini-2.0-flash-exp` is a half-cascade model supporting both TEXT and AUDIO responses. For native audio features, use `gemini-2.5-flash-native-audio-preview-12-2025`.
 
 ### Understand the Agent
 
@@ -437,6 +423,15 @@ The client only deals with:
 - **Receiving events** (responses, transcriptions, tool calls)
 
 The Agent's instruction, model selection, and tools are invisible to the frontend. This separation means you can change agent behavior without modifying client code.
+
+### Test Step 2
+
+No server restart needed - uvicorn's `--reload` flag automatically detects file changes.
+
+Verify the agent module is recognized:
+
+1. Check the terminal - you should see uvicorn reload the app
+2. If you see import errors, verify `my_agent/__init__.py` exists and is empty
 
 **Checkpoint**: Agent defined, but not yet connected to WebSocket.
 
@@ -526,10 +521,10 @@ async def websocket_endpoint(
                 response = {
                     "content": {
                         "parts": [{"text": f"ADK Ready! Model: {agent.model}"}]
-                    },
-                    "turnComplete": True
+                    }
                 }
                 await websocket.send_text(json.dumps(response))
+                await websocket.send_text(json.dumps({"turnComplete": True}))
 
     except WebSocketDisconnect:
         print("Client disconnected")
@@ -568,38 +563,13 @@ const sessionId = "demo-session-" + Math.random().toString(36).substring(7);
 const ws_url = "ws://" + window.location.host + "/ws/" + userId + "/" + sessionId;
 ```
 
-**Session persistence scenarios:**
-
-| Scenario | Same userId | Same sessionId | Result |
-|----------|-------------|----------------|--------|
-| New tab | Yes | No (random) | New conversation |
-| Page refresh | Yes | No (random) | New conversation |
-| Stored sessionId | Yes | Yes | Resume conversation |
-
-**For session resumption**, you'd store the sessionId:
-
-```javascript
-// Store session ID to resume later
-localStorage.setItem('sessionId', sessionId);
-
-// Retrieve on page load
-const sessionId = localStorage.getItem('sessionId')
-    || "session-" + Math.random().toString(36).substring(7);
-```
-
-The server's `SessionService` pairs with these client-provided IDs to maintain conversation history across reconnections.
-
 ### Test Step 3
 
-Restart the server (Ctrl+C, then run again):
+No server restart needed - uvicorn's `--reload` flag automatically detects file changes.
 
-```bash
-python -m uvicorn main:app --reload --host 0.0.0.0 --port 8080
-```
+Send a message. You should see "ADK Ready! Model: gemini-live-2.5-flash-native-audio" in the chat.
 
-Send a message. You should see "ADK Ready! Model: gemini-2.0-flash-exp".
-
-**Checkpoint**: ADK components initialized!
+**Checkpoint**: ADK components initialized! The app is not ready for actual chat yet - we'll connect to the Live API in the next steps.
 
 ---
 
@@ -703,10 +673,10 @@ async def websocket_endpoint(
                 response = {
                     "content": {
                         "parts": [{"text": "Session ready! Streaming coming next..."}]
-                    },
-                    "turnComplete": True
+                    }
                 }
                 await websocket.send_text(json.dumps(response))
+                await websocket.send_text(json.dumps({"turnComplete": True}))
 
     except WebSocketDisconnect:
         print("Client disconnected")
@@ -1387,7 +1357,7 @@ Microphone → MediaStream → AudioContext (16kHz resample)
 
 ### Test Audio Input
 
-Restart the server:
+No server restart needed - uvicorn's `--reload` flag automatically detects file changes.
 
 1. Click "Start Audio" button
 2. Allow microphone access
@@ -1770,11 +1740,12 @@ For images sent infrequently (on user action), base64 overhead is acceptable. Th
 
 ### Test Image Input
 
-1. Restart the server
-2. Click the camera button (📷)
-3. Allow camera access
-4. Capture an image
-5. Ask "What do you see in this image?"
+No server restart needed - uvicorn's `--reload` flag automatically detects file changes.
+
+1. Click the camera button
+2. Allow camera access
+3. Capture an image
+4. Ask "What do you see in this image?"
 
 **Checkpoint**: Multimodal AI working!
 
