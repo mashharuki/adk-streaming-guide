@@ -343,8 +343,42 @@ You'll see the demo screen in your browser. Make sure the **Connected** indicato
 
 ![Echo: hello](assets/echo_hello.png)
 
+### Understanding the Event Console
 
-> **What you built**: A WebSocket server that receives messages and sends responses. The frontend displays it as a chat message because the response follows ADK's event format.
+The demo UI includes an **Event Console** panel on the right side of the screen. This is a powerful debugging tool that displays raw ADK events as they arrive from the server in real-time.
+
+**What the Event Console shows:**
+
+- Every event sent from the server, formatted as JSON
+- Event types identified by icons for quick scanning
+- Timestamps for understanding event timing and latency
+- Full event payload that you can expand to inspect
+
+**Event type icons:**
+
+| Icon | Event Type | Description |
+|------|------------|-------------|
+| 📝 | Text content | Model's text response chunks |
+| 🔊 | Audio content | Model's audio response chunks |
+| 🎤 | Input transcription | User's speech converted to text |
+| 📜 | Output transcription | Model's audio converted to text |
+| 🛠️ | Tool call | Model requesting to use a tool |
+| ✅ | Tool response | Result from tool execution |
+| ⏹️ | Turn complete | Model finished responding |
+| ⚡ | Interrupted | User interrupted the model |
+
+**How to use it:**
+
+1. **Toggle visibility**: Click the "Event Console" header or the toggle button to show/hide the panel
+2. **Clear events**: Use the clear button to reset the console between tests
+3. **Inspect events**: Click any event to see the full JSON payload
+4. **Trace message flow**: Watch events arrive in sequence to understand the streaming lifecycle
+
+At this step, you'll see two events for each message you send:
+1. A content event with the echo response
+2. A `turnComplete` event signaling the response is finished
+
+As you progress through the workshop, you'll see more event types—transcriptions, tool calls, audio chunks—giving you visibility into exactly how ADK streaming works under the hood.
 
 ### Client Code: WebSocket Connection
 
@@ -395,6 +429,10 @@ connectWebsocket();
 | `onmessage` | Receives all server events (text, audio, transcriptions) |
 | Auto-reconnect | Handles network interruptions gracefully |
 
+### Step 1 Checkpoint
+
+> **What you built**: You set up a FastAPI app with a WebSocket endpoint that receives messages and sends responses. The frontend displays it as a chat message because the response follows ADK's event format.
+
 **Why not REST API?** Traditional REST APIs use request-response patterns—you send a request and wait for the complete response. For streaming AI, we need the server to push events as they're generated. Both WebSocket and SSE (Server-Sent Events) solve this:
 
 | Protocol | Pros | Cons |
@@ -403,8 +441,6 @@ connectWebsocket();
 | **SSE** | Simpler, works over HTTP, better proxy support | Needs two endpoints for bidirectional streaming, requires base64 encoding for binary data |
 
 This workshop uses WebSocket for bidirectional audio streaming, but you can also choose to use SSE for text-only applications.
-
-**Checkpoint**: You set up a FastAPI app with a WebSocket endpoint and established a working connection with the frontend!
 
 ---
 
@@ -418,21 +454,55 @@ The agent files were downloaded during setup. Open `my_agent/agent.py` in the ed
 
 ### Understand the Agent
 
-**my_agent/agent.py:7-16**
+**my_agent/agent.py:1-16**
 ```python
+from google.adk.agents import Agent
+from google.adk.tools import google_search
+
 agent = Agent(
-    name="workshop_agent",        # Identifier for logs and debugging
-    model="gemini-live-2.5-flash-native-audio",  # Native audio model
-    instruction="...",            # System prompt - shapes personality
-    tools=[google_search],        # Tools the agent can call
+    name="workshop_agent",
+    model="gemini-live-2.5-flash-native-audio",
+    instruction="""You are a helpful AI assistant.
+
+    You can use Google Search to find current information.
+    Keep your responses concise and friendly.
+    """,
+    tools=[google_search],
 )
 ```
 
+**Agent parameters:**
+
+| Parameter | Purpose |
+|-----------|---------|
+| `name` | Identifier for logs, debugging, and multi-agent routing |
+| `model` | Gemini model to use (see Model Architectures below) |
+| `instruction` | System prompt that shapes the agent's personality and behavior |
+| `tools` | List of tools the agent can call during conversation |
+
 The Agent is **stateless**—it defines behavior, not conversation state. The same agent instance serves all users.
 
-### Model Architectures
+### The google_search Tool
 
-The `model` parameter determines which Gemini model powers your agent. Two fundamentally different architectures are available for voice AI:
+The `google_search` tool is a built-in ADK tool that enables your agent to search the web for current information:
+
+```python
+from google.adk.tools import google_search
+```
+
+**How it works:**
+
+1. When the user asks about current events, weather, or factual information, the model decides to call `google_search`
+2. ADK automatically executes the search and returns results to the model
+3. The model synthesizes the results into a natural response
+
+You'll see tool calls in the Event Console as 🛠️ (tool call) and ✅ (tool response) events. ADK handles tool execution automatically—you don't need to write any tool-handling code.
+
+> **Note**: The agent isn't integrated with ADK yet, so you can't test tool calls at this step. You'll try it in Step 6 when bidirectional streaming is complete—ask "Search for the weather in Tokyo" and watch the tool execution flow in the Event Console.
+
+### Choosing a Live API model
+
+The `model` parameter determines which Live API model powers your agent. Two fundamentally different architectures are available for voice AI:
 
 **Native Audio models** process audio end-to-end without text intermediates. They produce more natural prosody, support an extended voice library, and enable advanced features like affective dialog (emotional adaptation) and proactivity (model-initiated responses). The current model is `gemini-live-2.5-flash-native-audio`.
 
@@ -445,30 +515,16 @@ The `model` parameter determines which Gemini model powers your agent. Two funda
 | Advanced features | Affective dialog, proactivity | Limited |
 | Tool execution | Works but less predictable | More reliable |
 
-> **Choosing the right model:** For natural conversation with emotional awareness, use native audio. For applications prioritizing tool execution reliability or needing text output, test thoroughly with native audio before committing.
+**Find the latest supported models:**
 
-### Client Code: No Changes Needed
+- [Gemini Live API models](https://ai.google.dev/gemini-api/docs/models#live-models) — Google AI Studio (See **Gemini 2.5 Flash Live**)
+- [Vertex AI Live API models](https://cloud.google.com/vertex-ai/generative-ai/docs/live-api#supported-models) — Google Cloud
 
-The Agent is purely server-side—the client doesn't know or care about agent configuration. From the client's perspective:
+![Live API models](assets/vertex_ai_live_models.png)
 
-```
-Client sends: {"type": "text", "text": "Hello"}
-Client receives: {"content": {"parts": [{"text": "..."}]}, ...}
-```
+### Step 2 Checkpoint
 
-The client only deals with:
-- **Sending messages** (text, audio, images)
-- **Receiving events** (responses, transcriptions, tool calls)
-
-The Agent's instruction, model selection, and tools are invisible to the frontend. This separation means you can change agent behavior without modifying client code.
-
-### Test Step 2
-
-The `--reload` flag auto-detects file changes. Check the terminal—you should see uvicorn reload the app automatically.
-
-If you see import errors, verify `my_agent/__init__.py` exists and is empty.
-
-**Checkpoint**: Agent defined, but not yet connected to WebSocket.
+> **What you built**: You defined an AI agent with a system prompt, model selection, and tools. The agent is stateless and will serve all users. However, it's not yet connected to the WebSocket—that comes next.
 
 ---
 
@@ -511,9 +567,11 @@ Open `main.py` in the editor to examine the new code. Key additions:
 
 ### Test Step 3
 
-After the server reloads, send a message. You should see "ADK Ready! Model: gemini-live-2.5-flash-native-audio" in the chat.
+The `--reload` flag auto-detects file changes. Check the terminal—you should see uvicorn reload the app automatically. After the server reloads, send a message. You should see "ADK Ready! Model: gemini-live-2.5-flash-native-audio" in the chat.
 
-**Checkpoint**: ADK components initialized! The app is not ready for actual chat yet - we'll connect to the Live API in the next steps.
+### Step 3 Checkpoint
+
+> **What you built**: You initialized the three core ADK components—Agent, SessionService, and Runner. These are created once at startup and shared across all connections. The app isn't ready for actual chat yet—we'll connect to the Live API in the next steps.
 
 ### Understand the Components
 
@@ -574,7 +632,9 @@ Open `main.py` in the editor to examine the new code. Key additions:
 
 Restart and test. Open a second browser tab with the same URL.
 
-**Checkpoint**: Per-session resources created!
+### Step 4 Checkpoint
+
+> **What you built**: You implemented Phase 2 of the lifecycle—session initialization. Each WebSocket connection now gets its own RunConfig, Session, and LiveRequestQueue. The `finally` block ensures proper cleanup when connections close.
 
 ### Understand RunConfig
 
@@ -666,7 +726,9 @@ Sent to LiveRequestQueue
 
 The message goes to the model, but we're not receiving responses yet. That's next!
 
-**Checkpoint**: Upstream path working!
+### Step 5 Checkpoint
+
+> **What you built**: You implemented the upstream task that receives WebSocket messages and sends them to the model via `LiveRequestQueue.send_content()`. Messages are flowing to the Live API, but we're not receiving responses yet—that's next!
 
 ### Understand the Upstream Flow
 
@@ -771,7 +833,9 @@ Restart and try:
 
 Open the Event Console (right panel) to see raw events.
 
-**Checkpoint**: Full bidirectional text streaming!
+### Step 6 Checkpoint
+
+> **What you built**: You completed the bidirectional streaming loop! The downstream task uses `runner.run_live()` to receive events from the model and forward them to the client. You now have full text-based conversation with tool execution working.
 
 ### Understand run_live()
 
@@ -953,7 +1017,9 @@ After the server reloads:
 
 You should see your speech transcribed in the chat (if using a model with transcription support), and hear the AI's audio response through your speakers.
 
-**Checkpoint**: Bidirectional voice streaming working!
+### Step 7 Checkpoint
+
+> **What you built**: You added bidirectional audio streaming! The upstream task now handles binary WebSocket frames containing PCM audio, sending them via `send_realtime()`. The model responds with audio that plays through the browser's AudioWorklet.
 
 ### Multimodal Capabilities
 
@@ -1265,7 +1331,9 @@ After the server reloads:
 3. Capture an image
 4. Ask "What do you see in this image?"
 
-**Checkpoint**: Multimodal AI working!
+### Step 8 Checkpoint
+
+> **What you built**: You completed the full multimodal application! The server now handles text, audio, and image input through the same `LiveRequestQueue` interface. The model can see, hear, and respond with natural speech.
 
 ### Understand Image Format
 
