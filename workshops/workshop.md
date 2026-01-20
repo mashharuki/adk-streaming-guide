@@ -142,13 +142,18 @@ Each step builds on the previous one. You'll test after every step to see your p
 
 **Step 1: Open Cloud Shell Editor**
 
-Navigate to [ide.cloud.google.com](https://ide.cloud.google.com) in your browser.
+Navigate to [ide.cloud.google.com](https://ide.cloud.google.com) in your browser. Close the Gemini panel on the right side (we won't use it in this workshop).
 
 ![](assets/cloud_shell_editor.png)
 
 **Step 2: Download Workshop Files**
 
-Open a terminal in Cloud Shell Editor (Terminal → New Terminal) and download the workshop files:
+Open a terminal in Cloud Shell Editor (**Terminal** → **New Terminal**):
+
+![Refresh Explorer button](assets/new_terminal.png)
+
+Download the workshop files:
+
 
 ```bash
 mkdir -p ~/bidi-workshop && cd ~/bidi-workshop
@@ -163,6 +168,31 @@ Then open the project folder in the editor:
 2. Navigate to `bidi-workshop`
 3. Click **OK**
 
+Your project structure looks like this:
+
+```
+bidi-workshop/
+├── pyproject.toml                    # Python package configuration
+└── app/                              # Main application directory
+    ├── .env.template                  # Environment variables template (copy to .env)
+    ├── step1_main.py                 # Step 1: Minimal WebSocket server
+    ├── step3_main.py                 # Step 3: Application initialization
+    ├── step4_main.py                 # Step 4: Session initialization
+    ├── step5_main.py                 # Step 5: Upstream task
+    ├── step6_main.py                 # Step 6: Downstream task
+    ├── step7_main.py                 # Step 7: Bidirectional audio
+    ├── step8_main.py                 # Step 8: Image input
+    ├── my_agent/                     # Agent package
+    │   ├── __init__.py
+    │   └── agent.py                  # Agent definition
+    └── static/                       # Frontend assets
+        ├── index.html
+        ├── css/style.css
+        └── js/                       # WebSocket, audio capture/playback
+```
+
+Each `stepN_main.py` file is a complete, working version for that step. Copy it to `main.py` to use: `cp step1_main.py main.py`
+
 **Step 3: Configure Environment Variables**
 
 Rename the template file and edit it with your Google Cloud project ID:
@@ -172,7 +202,11 @@ cd ~/bidi-workshop/app
 cp .env.template .env
 ```
 
-Edit `app/.env` and replace `your_project_id` with your project ID:
+Click the **Refresh Explorer** button in the Explorer panel to see the new file. 
+
+![Refresh Explorer button](assets/refresh_explorer.png)
+
+Then edit `app/.env` and replace `your_project_id` with your project ID:
 
 ```bash
 GOOGLE_CLOUD_PROJECT=your_project_id
@@ -180,89 +214,27 @@ GOOGLE_CLOUD_LOCATION=us-central1
 GOOGLE_GENAI_USE_VERTEXAI=TRUE
 ```
 
-> **Finding your Project ID**: Click the project dropdown in the Cloud Console header to see your project ID.
+> **Finding your Project ID**: Run `gcloud projects list` to see your available projects, or check the project dropdown in the Cloud Console header.
 
-**Step 4: Set Up Authentication**
-
-Configure [Application Default Credentials (ADC)](https://cloud.google.com/docs/authentication/application-default-credentials) for Vertex AI access:
-
-```bash
-gcloud auth application-default login
-```
-
-Follow the prompts to authenticate. This creates credentials that ADK uses to access Vertex AI.
-
-> **Verify authentication**: Run `gcloud auth application-default print-access-token` to confirm credentials are configured.
-
-**Step 5: Install Dependencies**
+**Step 4: Install Dependencies**
 
 Now we'll install all the Python packages defined in pyproject.toml.
 
-Open a terminal in Cloud Shell Editor (Terminal → New Terminal) and run:
+Open a terminal and run:
 
 ```bash
+cd ~/bidi-workshop
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -e .
 ```
 
 This installs the bidi-workshop package and all required dependencies including:
-- `google-adk` - Agent Development Kit
-- [`fastapi`](https://fastapi.tiangolo.com/) - Web framework
-- [`uvicorn`](https://www.uvicorn.org/) - ASGI server
-- [`python-dotenv`](https://pypi.org/project/python-dotenv/) - Environment variable management
 
-### Understanding the Directory Structure
-
-After completing the setup, your project structure looks like this:
-
-```
-bidi-workshop/
-├── pyproject.toml                    # Python package configuration (downloaded)
-└── app/                              # Main application directory
-    ├── .env.template                  # Environment variables template (copy to .env)
-    ├── main.py                       # Active server file (copy from stepN_main.py)
-    ├── step1_main.py                 # Step 1: Minimal WebSocket server
-    ├── step3_main.py                 # Step 3: Application initialization
-    ├── step4_main.py                 # Step 4: Session initialization
-    ├── step5_main.py                 # Step 5: Upstream task
-    ├── step6_main.py                 # Step 6: Downstream task
-    ├── step7_main.py                 # Step 7: Bidirectional audio
-    ├── step8_main.py                 # Step 8: Image input
-    ├── my_agent/                     # Agent package (pre-downloaded)
-    │   ├── __init__.py               # Package initialization
-    │   └── agent.py                  # Agent definition
-    └── static/                       # Frontend assets (pre-downloaded)
-        ├── index.html                # Main HTML page
-        ├── css/
-        │   └── style.css             # UI styling
-        └── js/
-            ├── app.js                # WebSocket, event handling, UI logic
-            ├── audio-recorder.js     # Microphone capture (16kHz PCM)
-            ├── audio-player.js       # Audio playback (24kHz PCM)
-            ├── pcm-recorder-processor.js  # AudioWorklet for recording
-            └── pcm-player-processor.js    # AudioWorklet for playback
-```
-
-**How to use the step files:**
-
-Each step has a complete, working `stepN_main.py` file. To use a step:
-
-```bash
-cp step1_main.py main.py  # Copy step file to main.py
-```
-
-**Downloaded files:**
-
-| File | Purpose |
-|------|---------|
-| `pyproject.toml` | Python package configuration and dependencies |
-| `app/.env.template` | Environment variables template (copy to .env) |
-| `app/stepN_main.py` | Complete server implementation for each step |
-| `app/my_agent/agent.py` | Agent definition (model, tools, instruction) |
-| `app/static/*` | Frontend: HTML, CSS, WebSocket, audio capture/playback |
-
-**Key insight:** The Python backend handles ADK integration. The JavaScript frontend handles browser APIs for audio/video. They communicate via WebSocket.
+- `google-adk` - [Agent Development Kit](https://google.github.io/adk-docs/) for building AI agents with Gemini
+- `fastapi` - [FastAPI](https://fastapi.tiangolo.com/), modern Python web framework with WebSocket support
+- `uvicorn` - [Uvicorn](https://www.uvicorn.org/), ASGI server to run FastAPI applications
+- `python-dotenv` - [python-dotenv](https://pypi.org/project/python-dotenv/), loads environment variables from `.env` files
 
 ---
 
