@@ -163,38 +163,7 @@ Then open the project folder in the editor:
 2. Navigate to `bidi-workshop`
 3. Click **OK**
 
-**Step 3: Create pyproject.toml**
-
-This file defines our Python package and its dependencies, including the ADK and FastAPI.
-
-Create the Python package configuration. In Cloud Shell Editor:
-
-1. Right-click on `bidi-workshop` folder → **New File**
-2. Name it `pyproject.toml`
-3. Add this content:
-
-```toml
-[project]
-name = "bidi-workshop"
-version = "0.1.0"
-requires-python = ">=3.10"
-dependencies = [
-    "google-adk>=1.22.1",
-    "fastapi>=0.115.0",
-    "uvicorn>=0.32.0",
-    "python-dotenv>=1.0.0",
-    "websockets>=13.0",
-]
-
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
-
-[tool.hatch.build.targets.wheel]
-packages = ["app"]
-```
-
-**Step 4: Configure Environment Variables**
+**Step 3: Configure Environment Variables**
 
 We'll configure the application to use Vertex AI, which automatically authenticates using your Cloud Shell credentials.
 
@@ -215,7 +184,7 @@ Replace `your_project_id` with your Google Cloud project ID.
 
 > **Finding your Project ID**: Click the project dropdown in the Cloud Console header to see your project ID.
 
-**Step 5: Set Up Authentication**
+**Step 4: Set Up Authentication**
 
 Configure [Application Default Credentials (ADC)](https://cloud.google.com/docs/authentication/application-default-credentials) for Vertex AI access:
 
@@ -227,7 +196,7 @@ Follow the prompts to authenticate. This creates credentials that ADK uses to ac
 
 > **Verify authentication**: Run `gcloud auth application-default print-access-token` to confirm credentials are configured.
 
-**Step 6: Install Dependencies**
+**Step 5: Install Dependencies**
 
 Now we'll install all the Python packages defined in pyproject.toml.
 
@@ -251,9 +220,9 @@ After completing the setup, your project structure looks like this:
 
 ```
 bidi-workshop/
-├── pyproject.toml                    # Python package configuration
+├── pyproject.toml                    # Python package configuration (downloaded)
 └── app/                              # Main application directory
-    ├── .env                          # Environment variables (API key, model)
+    ├── .env                          # Environment variables (you create this)
     ├── main.py                       # Active server file (copy from stepN_main.py)
     ├── step1_main.py                 # Step 1: Minimal WebSocket server
     ├── step3_main.py                 # Step 3: Application initialization
@@ -285,13 +254,14 @@ Each step has a complete, working `stepN_main.py` file. To use a step:
 cp step1_main.py main.py  # Copy step file to main.py
 ```
 
-**Pre-downloaded files:**
+**Downloaded files:**
 
 | File | Purpose |
 |------|---------|
-| `stepN_main.py` | Complete server implementation for each step |
-| `my_agent/agent.py` | Agent definition (model, tools, instruction) |
-| `static/*.js` | Frontend: WebSocket, audio capture/playback, UI |
+| `pyproject.toml` | Python package configuration and dependencies |
+| `app/stepN_main.py` | Complete server implementation for each step |
+| `app/my_agent/agent.py` | Agent definition (model, tools, instruction) |
+| `app/static/*` | Frontend: HTML, CSS, WebSocket, audio capture/playback |
 
 **Key insight:** The Python backend handles ADK integration. The JavaScript frontend handles browser APIs for audio/video. They communicate via WebSocket.
 
