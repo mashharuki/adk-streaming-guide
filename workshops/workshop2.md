@@ -20,14 +20,15 @@ Unlike reading documentation, you'll **write every line of code yourself**, unde
 We follow an incremental build approach:
 
 ```
-Step 1: Empty project           → "Hello World" response
-Step 2: Add Agent               → AI-powered responses
-Step 3: Add session management  → Conversation memory
-Step 4: Add text streaming      → Real-time text chat
-Step 5: Add audio input         → Voice input
-Step 6: Add audio output        → Voice responses
-Step 7: Add image input         → Multimodal AI
-Step 8: Production polish       → Error handling & cleanup
+Step 1: Minimal WebSocket server → "Hello World" response
+Step 2: Add the Agent            → AI-powered responses
+Step 3: Application Initialization → Runner and session service
+Step 4: Session Initialization   → RunConfig and LiveRequestQueue
+Step 5: Upstream Task            → Client to queue communication
+Step 6: Downstream Task          → Events to client streaming
+Step 7: Add Audio                → Voice input and output
+Step 8: Add Image Input          → Multimodal AI
+Step 9: Production Polish        → Error handling & cleanup
 ```
 
 Each step builds on the previous one. You'll test after every step to see your progress.
@@ -438,12 +439,9 @@ The Agent's instruction, model selection, and tools are invisible to the fronten
 
 ### Test Step 2
 
-No server restart needed - uvicorn's `--reload` flag automatically detects file changes.
+The `--reload` flag auto-detects file changes. Check the terminal—you should see uvicorn reload the app automatically.
 
-Verify the agent module is recognized:
-
-1. Check the terminal - you should see uvicorn reload the app
-2. If you see import errors, verify `my_agent/__init__.py` exists and is empty
+If you see import errors, verify `my_agent/__init__.py` exists and is empty.
 
 **Checkpoint**: Agent defined, but not yet connected to WebSocket.
 
@@ -544,9 +542,7 @@ async def websocket_endpoint(
 
 ### Test Step 3
 
-No server restart needed - uvicorn's `--reload` flag automatically detects file changes.
-
-Send a message. You should see "ADK Ready! Model: gemini-live-2.5-flash-native-audio" in the chat.
+After the server reloads, send a message. You should see "ADK Ready! Model: gemini-live-2.5-flash-native-audio" in the chat.
 
 **Checkpoint**: ADK components initialized! The app is not ready for actual chat yet - we'll connect to the Live API in the next steps.
 
@@ -1170,19 +1166,20 @@ Each event appends text to the same bubble, creating the "typing" effect.
 
 ---
 
-## Step 7: Add Audio Input (10 min)
+## Step 7: Add Audio (15 min)
 
-Let's add voice input support.
+Let's add bidirectional voice support—both speaking to the AI and hearing its responses.
 
 ### Update main.py
 
 Replace `app/main.py` with:
 
 ```python
-"""Step 7: Audio input - receiving voice from the client."""
+"""Step 7: Bidirectional audio - voice input and output."""
 
 import asyncio
 import json
+import warnings
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -1194,6 +1191,10 @@ from google.adk.agents.run_config import RunConfig, StreamingMode
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 from google.genai import types
+
+# Suppress noisy warnings
+warnings.filterwarnings("ignore", message="Your application has authenticated using end user credentials")
+warnings.filterwarnings("ignore", category=UserWarning, module="pydantic")
 
 load_dotenv(Path(__file__).parent / ".env")
 
@@ -1301,16 +1302,16 @@ async def websocket_endpoint(
 
 ### Test Step 7
 
-No server restart needed - uvicorn's `--reload` flag automatically detects file changes.
+After the server reloads:
 
 1. Click "Start Audio" button
 2. Allow microphone access
 3. Speak "Hello, can you hear me?"
-4. Wait for the response
+4. Wait for the response—you should hear the AI speak back!
 
-You should see your speech transcribed in the chat (if using a model with transcription support).
+You should see your speech transcribed in the chat (if using a model with transcription support), and hear the AI's audio response through your speakers.
 
-**Checkpoint**: Voice input working!
+**Checkpoint**: Bidirectional voice streaming working!
 
 ### Understand Audio Format
 
@@ -1432,55 +1433,9 @@ Microphone → MediaStream → AudioContext (16kHz resample)
 | `Float32 → Int16` | Convert Web Audio format to PCM |
 | Binary WebSocket frame | More efficient than base64 encoding |
 
----
-
-## Step 8: Add Audio Output (10 min)
-
-Let's enable voice responses.
-
-### Update RunConfig for Audio Output
-
-Modify the RunConfig to request audio responses:
-
-```python
-@app.websocket("/ws/{user_id}/{session_id}")
-async def websocket_endpoint(
-    websocket: WebSocket,
-    user_id: str,
-    session_id: str,
-) -> None:
-    await websocket.accept()
-
-    # Check if using native audio model
-    model_name = agent.model
-    is_native_audio = "native-audio" in model_name.lower()
-
-    if is_native_audio:
-        # Native audio: must use AUDIO response modality
-        run_config = RunConfig(
-            streaming_mode=StreamingMode.BIDI,
-            response_modalities=["AUDIO"],
-            input_audio_transcription=types.AudioTranscriptionConfig(),
-            output_audio_transcription=types.AudioTranscriptionConfig(),
-        )
-        print("Using native audio model with AUDIO responses")
-    else:
-        # Half-cascade: can use TEXT or AUDIO
-        # For voice, use AUDIO; for text chat, use TEXT
-        run_config = RunConfig(
-            streaming_mode=StreamingMode.BIDI,
-            response_modalities=["AUDIO"],  # Change to "TEXT" for text-only
-            input_audio_transcription=types.AudioTranscriptionConfig(),
-            output_audio_transcription=types.AudioTranscriptionConfig(),
-        )
-        print("Using half-cascade model with AUDIO responses")
-
-    # ... rest of the code
-```
-
 ### Understand Audio Response Events
 
-When `response_modalities=["AUDIO"]`, the model returns audio in events:
+Since we configured `response_modalities=["AUDIO"]`, the model returns audio in events:
 
 ```python
 # Audio arrives as inline_data in content parts
@@ -1620,24 +1575,9 @@ Ring buffer visualization:
 
 The buffer absorbs timing variations between network arrival and audio playback, ensuring smooth output even with irregular packet delivery.
 
-### Test Audio Output
-
-1. Update `.env` to use a native audio model (optional):
-   ```bash
-   DEMO_AGENT_MODEL=gemini-2.5-flash-native-audio-preview-12-2025
-   ```
-
-2. Restart the server
-
-3. Click "Start Audio" and speak
-
-4. The model responds with voice!
-
-**Checkpoint**: Bidirectional voice streaming!
-
 ---
 
-## Step 9: Add Image Input (10 min)
+## Step 8: Add Image Input (10 min)
 
 Let's add camera/image support for multimodal AI.
 
@@ -1804,7 +1744,7 @@ For images sent infrequently (on user action), base64 overhead is acceptable. Th
 
 ### Test Image Input
 
-No server restart needed - uvicorn's `--reload` flag automatically detects file changes.
+After the server reloads:
 
 1. Click the camera button
 2. Allow camera access
@@ -1815,7 +1755,7 @@ No server restart needed - uvicorn's `--reload` flag automatically detects file 
 
 ---
 
-## Step 10: Production Polish (10 min)
+## Step 9: Production Polish (10 min)
 
 Let's add proper error handling and logging.
 
