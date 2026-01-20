@@ -48,15 +48,25 @@ Each step builds on the previous one. You'll test after every step to see your p
 
 ## Environment Setup (10 min)
 
-### Open Cloud Shell Editor
+Cloud Shell Editor provides a browser-based development environment with VS Code functionality. No local setup required!
+
+**Step 1: Open Cloud Shell Editor**
+
+We'll use Google's browser-based IDE so you don't need to install anything locally.
 
 Navigate to [ide.cloud.google.com](https://ide.cloud.google.com) in your browser.
 
-Cloud Shell Editor provides a browser-based VS Code environment—no local setup required.
+Alternatively:
+- Go to [shell.cloud.google.com](https://shell.cloud.google.com)
+- Click "Open Editor" in the toolbar
 
-### Create Project Structure
+![](assets/cloud_shell_editor.png)
 
-Open a terminal (Terminal → New Terminal) and create the project:
+**Step 2: Create Project Structure**
+
+We'll create the folder structure for our bidi-streaming application with directories for the backend, frontend assets, and agent code.
+
+Open a terminal in Cloud Shell Editor (Terminal → New Terminal) and run:
 
 ```bash
 mkdir -p ~/bidi-workshop/app/static/js
@@ -65,11 +75,19 @@ mkdir -p ~/bidi-workshop/app/my_agent
 cd ~/bidi-workshop
 ```
 
-### Create pyproject.toml
+Then open the project folder in the editor:
+
+1. Click **File** → **Open Folder** in the menu bar
+2. Navigate to `bidi-workshop`
+3. Click **OK**
+
+**Step 3: Create pyproject.toml**
+
+This file defines our Python package and its dependencies, including the ADK and FastAPI.
 
 Create the Python package configuration. In Cloud Shell Editor:
 
-1. Right-click on `bidi-workshop` folder → New File
+1. Right-click on `bidi-workshop` folder → **New File**
 2. Name it `pyproject.toml`
 3. Add this content:
 
@@ -79,7 +97,7 @@ name = "bidi-workshop"
 version = "0.1.0"
 requires-python = ">=3.10"
 dependencies = [
-    "google-adk>=1.0.0",
+    "google-adk>=1.22.1",
     "fastapi>=0.115.0",
     "uvicorn>=0.32.0",
     "python-dotenv>=1.0.0",
@@ -89,46 +107,71 @@ dependencies = [
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
 ```
 
-### Configure Environment Variables
+**Step 4: Configure Environment Variables**
 
-Create `app/.env`:
+We'll configure the application to use Vertex AI, which automatically authenticates using your Cloud Shell credentials.
+
+Create a new `.env` file in the `app/` directory:
+
+1. Right-click on the `app` folder in the Explorer panel
+2. Select **New File**
+3. Name it `.env`
+4. Add the following content:
 
 ```bash
-GOOGLE_API_KEY=your_api_key_here
-GOOGLE_GENAI_USE_VERTEXAI=FALSE
+GOOGLE_CLOUD_PROJECT=your_project_id
+GOOGLE_CLOUD_LOCATION=us-central1
+GOOGLE_GENAI_USE_VERTEXAI=TRUE
 ```
 
-> **Get an API key**: Visit [aistudio.google.com](https://aistudio.google.com) → Get API Key → Create API key
+Replace `your_project_id` with your Google Cloud project ID.
 
-### Install Dependencies
+> **Finding your Project ID**: Click the project dropdown in the Cloud Console header to see your project ID.
+
+**Step 5: Install Dependencies**
+
+Now we'll install all the Python packages defined in pyproject.toml.
+
+Open a terminal in Cloud Shell Editor (Terminal → New Terminal) and run:
 
 ```bash
-cd ~/bidi-workshop
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -e .
 ```
 
-### Download Frontend Assets
+This installs the bidi-workshop package and all required dependencies including:
+- `google-adk` - Agent Development Kit
+- [`fastapi`](https://fastapi.tiangolo.com/) - Web framework
+- [`uvicorn`](https://www.uvicorn.org/) - ASGI server
+- [`python-dotenv`](https://pypi.org/project/python-dotenv/) - Environment variable management
 
-We'll focus on the Python backend. Download the pre-built frontend:
+**Step 6: Download Frontend Assets**
+
+The frontend handles audio capture/playback using Web Audio APIs. Since this workshop focuses on ADK concepts, we'll use pre-built frontend files.
+
+Download the pre-built frontend:
 
 ```bash
 cd ~/bidi-workshop/app/static
 
 # Download HTML
-curl -O https://raw.githubusercontent.com/google/adk-samples/main/python/agents/bidi-demo/app/static/index.html
+curl -o index.html https://raw.githubusercontent.com/google/adk-samples/main/python/agents/bidi-demo/app/static/index.html
 
 # Download CSS
-curl -O https://raw.githubusercontent.com/google/adk-samples/main/python/agents/bidi-demo/app/static/css/styles.css -o css/styles.css
+curl -o css/styles.css https://raw.githubusercontent.com/google/adk-samples/main/python/agents/bidi-demo/app/static/css/styles.css
 
 # Download JavaScript files
-cd js
-curl -O https://raw.githubusercontent.com/google/adk-samples/main/python/agents/bidi-demo/app/static/js/app.js
-curl -O https://raw.githubusercontent.com/google/adk-samples/main/python/agents/bidi-demo/app/static/js/audio-recorder.js
-curl -O https://raw.githubusercontent.com/google/adk-samples/main/python/agents/bidi-demo/app/static/js/audio-player.js
-curl -O https://raw.githubusercontent.com/google/adk-samples/main/python/agents/bidi-demo/app/static/js/pcm-recorder-processor.js
-curl -O https://raw.githubusercontent.com/google/adk-samples/main/python/agents/bidi-demo/app/static/js/pcm-player-processor.js
+curl -o js/app.js https://raw.githubusercontent.com/google/adk-samples/main/python/agents/bidi-demo/app/static/js/app.js
+curl -o js/audio-recorder.js https://raw.githubusercontent.com/google/adk-samples/main/python/agents/bidi-demo/app/static/js/audio-recorder.js
+curl -o js/audio-player.js https://raw.githubusercontent.com/google/adk-samples/main/python/agents/bidi-demo/app/static/js/audio-player.js
+curl -o js/pcm-recorder-processor.js https://raw.githubusercontent.com/google/adk-samples/main/python/agents/bidi-demo/app/static/js/pcm-recorder-processor.js
+curl -o js/pcm-player-processor.js https://raw.githubusercontent.com/google/adk-samples/main/python/agents/bidi-demo/app/static/js/pcm-player-processor.js
 
 cd ~/bidi-workshop
 ```
@@ -2107,7 +2150,7 @@ name = "bidi-workshop"
 version = "0.1.0"
 requires-python = ">=3.10"
 dependencies = [
-    "google-adk>=1.0.0",
+    "google-adk>=1.22.1",
     "fastapi>=0.115.0",
     "uvicorn>=0.32.0",
     "python-dotenv>=1.0.0",
@@ -2117,6 +2160,9 @@ dependencies = [
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
 ```
 
 ---
