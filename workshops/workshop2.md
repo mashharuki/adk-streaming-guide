@@ -164,7 +164,7 @@ cd ~/bidi-workshop/app/static
 curl -o index.html https://raw.githubusercontent.com/google/adk-samples/main/python/agents/bidi-demo/app/static/index.html
 
 # Download CSS
-curl -o css/styles.css https://raw.githubusercontent.com/google/adk-samples/main/python/agents/bidi-demo/app/static/css/styles.css
+curl -o css/style.css https://raw.githubusercontent.com/google/adk-samples/main/python/agents/bidi-demo/app/static/css/style.css
 
 # Download JavaScript files
 curl -o js/app.js https://raw.githubusercontent.com/google/adk-samples/main/python/agents/bidi-demo/app/static/js/app.js
@@ -191,7 +191,7 @@ bidi-workshop/
     └── static/                       # Frontend assets (pre-downloaded)
         ├── index.html                # Main HTML page
         ├── css/
-        │   └── styles.css            # UI styling
+        │   └── style.css             # UI styling
         └── js/
             ├── app.js                # WebSocket, event handling, UI logic
             ├── audio-recorder.js     # Microphone capture (16kHz PCM)
@@ -272,15 +272,15 @@ async def websocket_endpoint(
                 text_data = message["text"]
                 print(f"Received text: {text_data}")
 
-                # Echo back a simple response
+                # Echo back a simple response (content first, then turnComplete)
+                import json
                 response = {
                     "content": {
                         "parts": [{"text": f"Echo: {text_data}"}]
-                    },
-                    "turnComplete": True
+                    }
                 }
-                import json
                 await websocket.send_text(json.dumps(response))
+                await websocket.send_text(json.dumps({"turnComplete": True}))
 
             elif "bytes" in message:
                 print(f"Received binary: {len(message['bytes'])} bytes")
