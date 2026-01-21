@@ -573,7 +573,7 @@ python -m uvicorn main:app --host 0.0.0.0 --port 8080
 
 Open the demo page on the browser, make sure the app is Connected, and send a "Hello" message. You should see "ADK Ready! Model: gemini-live-2.5-flash-native-audio" in the chat, confirming the ADK components are initialized. Check the Terminal to make sure the server log doesn't output any errors.
 
-### Understanding the Server Code: Core Components
+### Understanding the Server Code: Core ADK Components
 
 Open `main.py` in the editor to examine the new code. Key additions:
 
@@ -581,7 +581,13 @@ Open `main.py` in the editor to examine the new code. Key additions:
 - **SessionService**: `InMemorySessionService()` stores conversation history
 - **Runner**: Orchestrates agent execution with session management
 
-**step3_main.py:31-39**
+**step3_main.py:13-14** - Load environment variables for calling Live API:
+```python
+# Load environment variables BEFORE importing agent
+load_dotenv(Path(__file__).parent / ".env")
+```
+
+**step3_main.py:31-39** - Create SessionService and Runner:
 ```python
 # SessionService: Stores conversation history
 session_service = InMemorySessionService()  # Memory-based (lost on restart)
@@ -595,10 +601,9 @@ runner = Runner(
 )
 ```
 
-**Why single instances?**
-- Created once at startup, shared across all connections
-- Thread-safe and memory-efficient
-- SessionService enables conversation continuity across reconnections
+**[SessionService](https://google.github.io/adk-docs/sessions/)** persists conversation history across connections. When a user reconnects, their previous messages are restored. `InMemorySessionService` is simple but loses data on restart—use `DatabaseSessionService` or `VertexAiSessionService` for production. We'll see how to use ADK Session in Step 4.
+
+**[Runner](https://google.github.io/adk-docs/runtime/runners/)** is the central orchestrator that connects your agent to the Live API. It manages the streaming lifecycle, routes messages through the agent, executes tools, and persists events to the session. We'll see how `run_live()` works in Step 6.
 
 ### Understanding the Client Code: Session ID Generation
 
