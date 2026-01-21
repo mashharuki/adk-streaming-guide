@@ -1517,7 +1517,7 @@ elif json_message.get("type") == "image":
 
 Images are sent the same way as audio—via `send_realtime()`. The model processes them alongside text and audio for multimodal understanding.
 
-**Why base64 JSON instead of binary frames?** Unlike audio (sent continuously), images are sent occasionally on user action. The ~33% base64 overhead is acceptable, and JSON provides message routing (`type: "image"`) and metadata (`mimeType`) that binary frames can't include without a custom protocol.
+**Why base64 JSON instead of binary frames?** In this sample, binary WebSocket frames are already used for audio data. Since you can't mix image and audio data in the same binary stream without a custom protocol to distinguish them, images are sent as base64-encoded JSON with a `type` field for routing.
 
 ### Understanding the Client Code: Camera Capture
 
