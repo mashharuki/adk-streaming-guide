@@ -545,9 +545,9 @@ from google.adk.tools import google_search
 
 このステップでは、**1. アプリケーション初期化フェーズ**を追加します。ADKは起動時に一度初期化される3つのコンポーネントを必要とします：
 
-1. **Agent** - AI動作を定義（すでに作成済み）
-2. **SessionService** - 会話履歴を保存
-3. **Runner** - ストリーミングをオーケストレート
+1. **[Agent](https://google.github.io/adk-docs/agents/)** - AI動作を定義（すでに作成済み）
+2. **[SessionService](https://google.github.io/adk-docs/sessions/)** - 会話履歴を保存
+3. **[Runner](https://google.github.io/adk-docs/runtime/runners/)** - ストリーミングをオーケストレート
 
 ### サーバーを実行
 
@@ -567,7 +567,7 @@ python -m uvicorn main:app --host 0.0.0.0 --port 8080
 
 ### サーバーコードを理解する: コアADKコンポーネント
 
-エディタで`main.py`を開いて新しいコードを確認します。主な追加：
+エディタで`main.py`を開いて新しいコードを確認します。主な追加点：
 
 - **環境のロード**: `load_dotenv()`が`.env`をロード
 - **SessionService**: `InMemorySessionService()`が会話履歴をメモリに保存
@@ -646,10 +646,10 @@ Client connected: user=demo-user, session=demo-session-xoamfa
 Created new session: demo-session-xoamfa
 ```
 
-エディタで`main.py`を開いて新しいコードを確認します。主な追加：
+エディタで`main.py`を開いて新しいコードを確認します。主な追加点：
 
-- **RunConfig**: セッションのストリーミングモード、応答モダリティ、トランスクリプションを設定
-- **LiveRequestQueue**: モデルに入力を送信するためのキューを作成
+- **[RunConfig](https://google.github.io/adk-docs/streaming/dev-guide/part4/#understanding-runconfig)**: セッションのストリーミングモード、応答モダリティ、トランスクリプションを設定
+- **[LiveRequestQueue](https://google.github.io/adk-docs/streaming/dev-guide/part2/#liverequestqueue-the-upstream-interface)**: モデルに入力を送信するためのキューを作成
 - **終了処理**: `finally`ブロックでキューをクローズ
 - **セッション管理**: セッションを取得または作成
 
@@ -820,11 +820,11 @@ Sent to LiveRequestQueue
 
 この時点でメッセージはモデルに送られていますが、応答はまだ受信できていません（次のステップで受信可能になります）。
 
-エディタで`main.py`を開いて新しいコードを確認します。主な追加：
+エディタで`main.py`を開いて新しいコードを確認します。主な追加点：
 
 - **upstream_task()**: WebSocketメッセージを受信する非同期関数
 - **JSONパース**: `{"type": "text", "text": "..."}`メッセージからテキストを抽出
-- **types.Content**: テキストパートを持つADK Contentオブジェクトを作成
+- **[types.Content](https://google.github.io/adk-docs/streaming/dev-guide/part2/#sending-text-with-send_content)**: テキストパートを持つADK Contentオブジェクトを作成
 - **send_content()**: テキストをモデルに送信（即座に応答をトリガー）
 - **asyncio.gather()**: アップストリームとダウンストリームタスクを並行実行
 
@@ -851,8 +851,6 @@ async def upstream_task() -> None:
                 )
                 live_request_queue.send_content(content)
 ```
-
-クライアントが切断すると、`websocket.receive()`は`WebSocketDisconnect`を発生させます。この例外は`asyncio.gather()`まで伝播し、両タスクがキャンセルされ、クリーンアップが行われる`finally`ブロックに到達します。
 
 **クライアントからFastAPIへ:**
 ユーザーがUIでテキストメッセージを入力すると、クライアントはメッセージの種類を識別する`type`フィールド付きのJSONとして送信します：
@@ -908,8 +906,6 @@ finally:
 
 サーバーが受信メッセージをどのように処理するかを見たので、クライアント側を見てみましょう。フロントエンドJavaScriptはユーザー入力をキャプチャし、WebSocket接続経由で送信します。
 
-**なぜtypeフィールド付きJSONなのか？** クライアントはテキストと画像を`type`フィールド付きJSONとして送信し、サーバーが各メッセージを適切なハンドラーにルーティングできるようにします。このパターンは拡張可能です—プロトコルを変更せずに他のメッセージタイプ（例：`{"type": "clear_history"}`などの制御コマンド）を追加できます。音声は異なります—効率のために生のバイナリWebSocketフレームとして送信されます（ステップ7で見ます）。
-
 **テキストメッセージの送信 (app.js:755-766):**
 
 クライアントはWebSocket経由でテキストをJSONとして送信します。送信前に接続が開いていることを確認します。
@@ -925,6 +921,8 @@ function sendMessage(message) {
     }
 }
 ```
+
+**なぜプレーンテキストをそのまま送信しないのか？** クライアントはテキストと画像を`type`フィールド付きJSONとして送信し、サーバーが各メッセージを適切なハンドラーにルーティングできるようにします。このパターンは拡張可能です—プロトコルを変更せずに他のメッセージタイプ（例：`{"type": "clear_history"}`などの制御コマンド）を追加できます。なお、音声の送信方法はこれとは異なります。効率化のために生のバイナリWebSocketフレームとして送信します（ステップ7で見ます）。
 
 ### ステップ5チェックポイント
 
@@ -955,8 +953,8 @@ python -m uvicorn main:app --host 0.0.0.0 --port 8080
 **シナリオ1: ストリーミングテキストイベントを観察**
 
 1. 「東京の天気は？」と入力して送信
-2. Event Console（右パネル）を開いて、イベントが単語ごとに到着するのを観察
-3. 各イベントが応答を構築する小さなテキストピースを含んでいることに注目
+2. Event Console（右パネル）を確認し、イベントが単語ごとに到着するのを観察
+3. 各イベントが応答の一部分のテキストを含んでいることに注目
 
 **シナリオ2: 割り込みをテスト**
 1. 「日本の歴史を詳しく説明して」と入力
@@ -965,9 +963,9 @@ python -m uvicorn main:app --host 0.0.0.0 --port 8080
 
 ![Interrupt](assets/interrupt.png)
 
-エディタで`main.py`を開いて新しいコードを確認します。主な追加：
+エディタで`main.py`を開いて新しいコードを確認します。主な追加点：
 
-- **runner.run_live()**: モデルからイベントを生成する非同期ジェネレーター
+- **[runner.run_live()](https://google.github.io/adk-docs/streaming/dev-guide/part3/#understanding-run_live)**: モデルから[Event](https://google.github.io/adk-docs/streaming/dev-guide/part3/#event-types-reference)オブジェクトを生成する非同期ジェネレーター
 - **イベントのシリアライズ**: `event.model_dump_json()`がイベントをJSONに変換
 - **WebSocket転送**: 各イベントを即座にクライアントに送信
 - **エラー処理**: 例外をキャッチしてキューが確実にクローズされるようにする
@@ -1119,10 +1117,10 @@ python -m uvicorn main:app --host 0.0.0.0 --port 8080
 
 ### 音声処理を理解する
 
-エディタで`main.py`を開いて新しいコードを確認します。主な追加：
+エディタで`main.py`を開いて新しいコードを確認します。主な追加点：
 
 - **バイナリメッセージ処理**: WebSocketメッセージで`"bytes"`を検出
-- **types.Blob**: `audio/pcm;rate=16000` MIMEタイプで音声blobを作成
+- **[types.Blob](https://google.github.io/adk-docs/streaming/dev-guide/part2/#sending-audio-with-send_realtime)**: `audio/pcm;rate=16000` MIMEタイプで音声blobを作成
 - **send_realtime()**: 音声を継続的にストリーム（VADが応答をトリガー）
 
 **step7_main.py:85-97** - バイナリメッセージ処理：

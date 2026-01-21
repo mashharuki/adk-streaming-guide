@@ -554,9 +554,9 @@ This lifecycle pattern is fundamental to all streaming applications. You'll impl
 
 In this step, we will add the **1. Application Init phase**. ADK requires three components initialized once at startup:
 
-1. **Agent** - Defines AI behavior (already created)
-2. **SessionService** - Stores conversation history
-3. **Runner** - Orchestrates streaming
+1. **[Agent](https://google.github.io/adk-docs/agents/)** - Defines AI behavior (already created)
+2. **[SessionService](https://google.github.io/adk-docs/sessions/)** - Stores conversation history
+3. **[Runner](https://google.github.io/adk-docs/runtime/runners/)** - Orchestrates streaming
 
 ### Run the Server
 
@@ -659,8 +659,8 @@ Each browser tab generates a unique `session_id`, allowing multiple concurrent c
 
 Open `main.py` in the editor to examine the new code. Key additions:
 
-- **RunConfig**: Configures streaming mode, response modalities, and transcription
-- **LiveRequestQueue**: Creates the queue for sending input to the model
+- **[RunConfig](https://google.github.io/adk-docs/streaming/dev-guide/part4/#understanding-runconfig)**: Configures streaming mode, response modalities, and transcription
+- **[LiveRequestQueue](https://google.github.io/adk-docs/streaming/dev-guide/part2/#liverequestqueue-the-upstream-interface)**: Creates the queue for sending input to the model
 - **Termination**: Closes the queue in `finally` block
 - **Session management**: Gets or creates session for conversation history
 
@@ -838,7 +838,7 @@ Open `main.py` in the editor to examine the new code. Key additions:
 
 - **upstream_task()**: Async function that receives WebSocket messages
 - **JSON parsing**: Extracts text from `{"type": "text", "text": "..."}` messages
-- **types.Content**: Creates ADK Content object with text part
+- **[types.Content](https://google.github.io/adk-docs/streaming/dev-guide/part2/#sending-text-with-send_content)**: Creates ADK Content object with text part
 - **send_content()**: Sends text to the model (triggers immediate response)
 - **asyncio.gather()**: Runs upstream and downstream tasks concurrently
 
@@ -865,8 +865,6 @@ async def upstream_task() -> None:
                 )
                 live_request_queue.send_content(content)
 ```
-
-When the client disconnects, `websocket.receive()` raises `WebSocketDisconnect`. The exception propagates up to `asyncio.gather()`, which cancels both tasks and reaches the `finally` block where cleanup happens.
 
 **From the client to FastAPI:**
 When a user enters a text message in the UI, the client sends it as JSON with a `type` field to identify the message kind:
@@ -922,8 +920,6 @@ When the client disconnects, `WebSocketDisconnect` propagates from `upstream_tas
 
 Now that we've seen how the server handles incoming messages, let's look at the client side. The frontend JavaScript captures user input and sends it through the WebSocket connection.
 
-**Why JSON with a type field?** The client sends text and images as JSON with a `type` field, allowing the server to route each message to the appropriate handler. This pattern is extensible—you could add other message types like control commands (e.g., `{"type": "clear_history"}`) without changing the protocol. Audio is different—it's sent as raw binary WebSocket frames for efficiency (we'll see this in Step 7).
-
 **Sending text messages (app.js:755-766):**
 
 The client sends text as JSON through the WebSocket. It checks that the connection is open before sending.
@@ -939,6 +935,8 @@ function sendMessage(message) {
     }
 }
 ```
+
+**Why not just send plain text to the server?** The client sends text and images as JSON with a `type` field, allowing the server to route each message to the appropriate handler. This pattern is extensible—you could add other message types like control commands (e.g., `{"type": "clear_history"}`) without changing the protocol. Audio is different—it's sent as raw binary WebSocket frames for efficiency (we'll see this in Step 7).
 
 ### Step 5 Checkpoint
 
@@ -981,7 +979,7 @@ Try these two scenarios:
 
 Open `main.py` in the editor to examine the new code. Key additions:
 
-- **runner.run_live()**: Async generator that yields events from the model
+- **[runner.run_live()](https://google.github.io/adk-docs/streaming/dev-guide/part3/#understanding-run_live)**: Async generator that yields [Event](https://google.github.io/adk-docs/streaming/dev-guide/part3/#event-types-reference) objects from the model
 - **Event serialization**: `event.model_dump_json()` converts events to JSON
 - **WebSocket forwarding**: Sends each event to the client immediately
 - **Error handling**: Catches exceptions and ensures queue is closed
@@ -1136,7 +1134,7 @@ Test voice interaction:
 Open `main.py` in the editor to examine the new code. Key additions:
 
 - **Binary message handling**: Detects `"bytes"` in WebSocket message
-- **types.Blob**: Creates audio blob with `audio/pcm;rate=16000` MIME type
+- **[types.Blob](https://google.github.io/adk-docs/streaming/dev-guide/part2/#sending-audio-with-send_realtime)**: Creates audio blob with `audio/pcm;rate=16000` MIME type
 - **send_realtime()**: Streams audio continuously (VAD triggers response)
 
 **step7_main.py:85-97** - Binary message handling:
