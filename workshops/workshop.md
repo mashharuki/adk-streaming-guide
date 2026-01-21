@@ -256,7 +256,7 @@ The architecture consists of three main layers:
 
 ---
 
-## Step 1: Minimal WebSocket Server (10 min)
+## Step 1: Minimal WebSocket Server
 
 Let's start with the simplest possible WebSocket server that echoes messages back.
 
@@ -448,7 +448,7 @@ This workshop uses WebSocket for bidirectional audio streaming, but you can also
 
 ---
 
-## Step 2: Add the Agent (10 min)
+## Step 2: Add the Agent
 
 Now let's add an actual AI agent to generate real responses.
 
@@ -532,7 +532,7 @@ The `model` parameter determines which Live API model powers your agent. Two fun
 
 ---
 
-## Step 3: Application Initialization (10 min)
+## Step 3: Application Initialization
 
 Every bidi-streaming application follows this lifecycle:
 
@@ -620,7 +620,7 @@ const ws_url = "ws://" + window.location.host + "/ws/" + userId + "/" + sessionI
 
 ---
 
-## Step 4: Session Initialization (15 min)
+## Step 4: Session Initialization
 
 Each WebSocket connection needs its own session. This is Phase 2 of the lifecycle.
 
@@ -803,7 +803,7 @@ sequenceDiagram
 
 ---
 
-## Step 5: Upstream Task (15 min)
+## Step 5: Upstream Task
 
 Now we'll send text to the model using `LiveRequestQueue`.
 
@@ -934,7 +934,7 @@ The `sendMessage()` function packages text into JSON and sends it via WebSocket.
 
 ---
 
-## Step 6: Downstream Task (15 min)
+## Step 6: Downstream Task
 
 Now the exciting part—receiving streaming responses from the model!
 
@@ -961,8 +961,11 @@ Try these three scenarios:
 
 **Scenario 2: Watch tool execution**
 1. Type "Search for the weather in Tokyo"
-2. Watch the Event Console—you'll see tool call events followed by tool response events
-3. The model uses Google Search to get real-time weather data
+2. Watch the Event Console—you should see:
+   - 🔧 `Function Call: google_search({"query": ...})`
+   - 📦 `Function Response: google_search → {...}`
+   - Final text response with real-time weather data
+3. This confirms ADK's automatic tool execution is working
 
 **Scenario 3: Test interruption**
 1. Type "Explain the history of Japan in detail"
@@ -1096,7 +1099,7 @@ Each event appends text to the same bubble, creating the "typing" effect.
 
 ---
 
-## Step 7: Add Audio (15 min)
+## Step 7: Add Audio
 
 Let's add bidirectional voice support—both speaking to the AI and hearing its responses.
 
@@ -1114,14 +1117,24 @@ Restart the server:
 python -m uvicorn main:app --host 0.0.0.0 --port 8080
 ```
 
-Test voice interaction:
+Try these two scenarios:
+
+**Scenario 1: Test voice interaction**
 
 1. Click "Start Audio" button
 2. Allow microphone access
 3. Speak "Hello, can you hear me?"
 4. Wait for the response—you should hear the AI speak back!
+5. You should see your speech transcribed in the chat and hear the AI's audio response
 
-You should see your speech transcribed in the chat (if using a model with transcription support), and hear the AI's audio response through your speakers.
+**Scenario 2: Test Google Search tool via voice**
+
+1. Speak "What is the current Google stock price?"
+2. Watch the Event Console—you should see:
+   - `functionCall` event with `name: "google_search"`
+   - `functionResponse` event with search results
+   - Final response with real-time stock data
+3. This confirms ADK's automatic tool execution is working with voice input
 
 Open `main.py` in the editor to examine the new code. Key additions:
 
@@ -1416,7 +1429,7 @@ The buffer absorbs timing variations between network arrival and audio playback,
 
 ---
 
-## Step 8: Add Image Input (10 min)
+## Step 8: Add Image Input
 
 Let's add camera/image support for multimodal AI.
 
