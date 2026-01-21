@@ -107,25 +107,7 @@ async def websocket_endpoint(
             run_config=run_config,
         ):
             event_json = event.model_dump_json(exclude_none=True, by_alias=True)
-
-            # Log function calls with full details
-            if event.content and event.content.parts:
-                for part in event.content.parts:
-                    if part.function_call:
-                        print(f"[DOWNSTREAM] 🔧 Function Call: {part.function_call.name}({part.function_call.args})")
-                    elif part.function_response:
-                        print(f"[DOWNSTREAM] 📦 Function Response: {part.function_response.name}")
-                    elif part.text:
-                        print(f"[DOWNSTREAM] 💬 Text: {part.text[:80]}...")
-                    elif part.inline_data:
-                        print(f"[DOWNSTREAM] 🔊 Audio: {len(part.inline_data.data)} bytes")
-            elif event.turn_complete:
-                print("[DOWNSTREAM] ✅ Turn Complete")
-            elif event.interrupted:
-                print("[DOWNSTREAM] ⏸️ Interrupted")
-            else:
-                print(f"[DOWNSTREAM] Event: {event_json[:100]}...")
-
+            print(f"[DOWNSTREAM] Event: {event_json[:100]}...")
             await websocket.send_text(event_json)
 
         print("[DOWNSTREAM] run_live() completed")

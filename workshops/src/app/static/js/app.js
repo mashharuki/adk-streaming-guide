@@ -383,36 +383,6 @@ function connectWebsocket() {
       const hasAudio = adkEvent.content.parts.some(p => p.inlineData);
       const hasExecutableCode = adkEvent.content.parts.some(p => p.executableCode);
       const hasCodeExecutionResult = adkEvent.content.parts.some(p => p.codeExecutionResult);
-      const hasFunctionCall = adkEvent.content.parts.some(p => p.functionCall);
-      const hasFunctionResponse = adkEvent.content.parts.some(p => p.functionResponse);
-
-      if (hasFunctionCall) {
-        // Show function call
-        const callPart = adkEvent.content.parts.find(p => p.functionCall);
-        if (callPart && callPart.functionCall) {
-          const funcName = callPart.functionCall.name || 'unknown';
-          const args = JSON.stringify(callPart.functionCall.args || {});
-          const truncatedArgs = args.length > 50
-            ? args.substring(0, 50) + '...'
-            : args;
-          eventSummary = `Function Call: ${funcName}(${truncatedArgs})`;
-          eventEmoji = '🔧';
-        }
-      }
-
-      if (hasFunctionResponse) {
-        // Show function response
-        const respPart = adkEvent.content.parts.find(p => p.functionResponse);
-        if (respPart && respPart.functionResponse) {
-          const funcName = respPart.functionResponse.name || 'unknown';
-          const response = JSON.stringify(respPart.functionResponse.response || {});
-          const truncatedResp = response.length > 50
-            ? response.substring(0, 50) + '...'
-            : response;
-          eventSummary = `Function Response: ${funcName} → ${truncatedResp}`;
-          eventEmoji = '📦';
-        }
-      }
 
       if (hasExecutableCode) {
         // Show executable code

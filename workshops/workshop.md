@@ -952,22 +952,15 @@ Restart the server:
 python -m uvicorn main:app --host 0.0.0.0 --port 8080
 ```
 
-Try these three scenarios:
+Try these two scenarios:
 
 **Scenario 1: Watch streaming text events**
-1. Type "Hello" and send
+
+1. Type "What's the weather in Tokyo?" and send
 2. Open the Event Console (right panel) and watch events arrive word by word
 3. Notice each event contains a small piece of text that builds up the response
 
-**Scenario 2: Watch tool execution**
-1. Type "Search for the weather in Tokyo"
-2. Watch the Event Console—you should see:
-   - 🔧 `Function Call: google_search({"query": ...})`
-   - 📦 `Function Response: google_search → {...}`
-   - Final text response with real-time weather data
-3. This confirms ADK's automatic tool execution is working
-
-**Scenario 3: Test interruption**
+**Scenario 2: Test interruption**
 1. Type "Explain the history of Japan in detail"
 2. While the model is responding, type "Stop" and send it
 3. Watch the Event Console—you'll see an `interrupted` event, then the model starts responding to your new message
@@ -1117,24 +1110,13 @@ Restart the server:
 python -m uvicorn main:app --host 0.0.0.0 --port 8080
 ```
 
-Try these two scenarios:
-
-**Scenario 1: Test voice interaction**
+Test voice interaction:
 
 1. Click "Start Audio" button
 2. Allow microphone access
 3. Speak "Hello, can you hear me?"
 4. Wait for the response—you should hear the AI speak back!
 5. You should see your speech transcribed in the chat and hear the AI's audio response
-
-**Scenario 2: Test Google Search tool via voice**
-
-1. Speak "What is the current Google stock price?"
-2. Watch the Event Console—you should see:
-   - `functionCall` event with `name: "google_search"`
-   - `functionResponse` event with search results
-   - Final response with real-time stock data
-3. This confirms ADK's automatic tool execution is working with voice input
 
 Open `main.py` in the editor to examine the new code. Key additions:
 
