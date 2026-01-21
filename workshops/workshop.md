@@ -269,7 +269,46 @@ cd ~/bidi-workshop/app
 cp step1_main.py main.py
 ```
 
-Open `main.py` in the editor to examine the code.
+Open `main.py` in the editor to examine the code. Key components:
+
+- **FastAPI app**: Creates web server with WebSocket support
+- **Static files**: Serves frontend assets (HTML, CSS, JS)
+- **WebSocket endpoint**: Accepts connections at `/ws/{user_id}/{session_id}`
+- **Echo response**: Returns messages in ADK event format
+
+### Test Step 1
+
+Start the server:
+
+```bash
+cd ~/bidi-workshop/app
+python -m uvicorn main:app --host 0.0.0.0 --port 8080
+```
+
+You should see:
+
+```
+INFO:     Uvicorn running on http://0.0.0.0:8080 (Press CTRL+C to quit)
+INFO:     Started server process [...]
+INFO:     Application startup complete.
+```
+
+Click **Web Preview** button and choose **Preview on port 8080**.
+
+![Web Preview button](assets/web_preview.png)
+
+You'll see the demo screen in your browser. Make sure the **Connected** indicator appears in the top right corner—this confirms the WebSocket connection is working.
+
+![Connected](assets/connected.png)
+
+**Test it:**
+1. Type "Hello" in the text input
+2. Click Send
+3. You should see "Echo: {"type": "text", "text": "Hello"}" in the chat
+
+![Echo: hello](assets/echo_hello.png)
+
+### Understanding the Server Code
 
 **step1_main.py:9-14** - Create FastAPI app and serve static files:
 ```python
@@ -310,39 +349,6 @@ await websocket.send_text(json.dumps({"turnComplete": True}))
 
 At this point, we're just echoing back the input message without using any ADK functionality yet. However, the response follows ADK's event format: `content.parts[].text` for text responses, and `turnComplete: true` to signal the response is finished. We'll explore this event format in detail in Step 6. The frontend already understands this format, so our echo appears as a chat message.
 
-### Test Step 1
-
-Start the server:
-
-```bash
-cd ~/bidi-workshop/app
-python -m uvicorn main:app --reload --host 0.0.0.0 --port 8080
-```
-
-You should see:
-
-```
-INFO:     Uvicorn running on http://0.0.0.0:8080 (Press CTRL+C to quit)
-INFO:     Started reloader process [...] using StatReload
-INFO:     Started server process [...]
-INFO:     Application startup complete.
-```
-
-Click **Web Preview** button and choose **Preview on port 8080**.
-
-![Web Preview button](assets/web_preview.png)
-
-You'll see the demo screen in your browser. Make sure the **Connected** indicator appears in the top right corner—this confirms the WebSocket connection is working.
-
-![Connected](assets/connected.png)
-
-**Test it:**
-1. Type "Hello" in the text input
-2. Click Send
-3. You should see "Echo: {"type": "text", "text": "Hello"}" in the chat
-
-![Echo: hello](assets/echo_hello.png)
-
 ### Understanding the Event Console
 
 The demo UI includes an **Event Console** panel on the right side of the screen. This is a powerful debugging tool that displays raw ADK events as they arrive from the server in real-time.
@@ -380,7 +386,7 @@ At this step, you'll see two events for each message you send:
 
 As you progress through the workshop, you'll see more event types—transcriptions, tool calls, audio chunks—giving you visibility into exactly how ADK streaming works under the hood.
 
-### Client Code: WebSocket Connection
+### Understanding the Client Code: WebSocket Connection
 
 The frontend establishes and manages the WebSocket connection. Here's what happens on the client side:
 
@@ -429,10 +435,6 @@ connectWebsocket();
 | `onmessage` | Receives all server events (text, audio, transcriptions) |
 | Auto-reconnect | Handles network interruptions gracefully |
 
-### Step 1 Checkpoint
-
-> **What you built**: You set up a FastAPI app with a WebSocket endpoint that receives messages and sends responses. The frontend displays it as a chat message because the response follows ADK's event format.
-
 **Why not REST API?** Traditional REST APIs use request-response patterns—you send a request and wait for the complete response. For streaming AI, we need the server to push events as they're generated. Both WebSocket and SSE (Server-Sent Events) solve this:
 
 | Protocol | Pros | Cons |
@@ -441,6 +443,10 @@ connectWebsocket();
 | **SSE** | Simpler, works over HTTP, better proxy support | Needs two endpoints for bidirectional streaming, requires base64 encoding for binary data |
 
 This workshop uses WebSocket for bidirectional audio streaming, but you can also choose to use SSE for text-only applications.
+
+### Step 1 Checkpoint
+
+> **What you built**: You set up a FastAPI app with a WebSocket endpoint that receives messages and sends responses. The frontend displays it as a chat message because the response follows ADK's event format.
 
 ---
 
@@ -530,15 +536,7 @@ The `model` parameter determines which Live API model powers your agent. Two fun
 
 ## Step 3: Application Initialization (10 min)
 
-ADK requires three components initialized once at startup:
-
-1. **Agent** - Defines AI behavior (already created)
-2. **SessionService** - Stores conversation history
-3. **Runner** - Orchestrates streaming
-
-### The 4-Phase Lifecycle
-
-Every bidi-streaming session follows this lifecycle:
+Every bidi-streaming application follows this lifecycle:
 
 ![4-Phase Application Lifecycle](assets/app_lifecycle.png)
 
@@ -549,31 +547,39 @@ Every bidi-streaming session follows this lifecycle:
 | **3. Bidi-streaming** | Active conversation | Concurrent upstream (input) and downstream (events) tasks |
 | **4. Termination** | Connection closes | Close LiveRequestQueue, cleanup resources |
 
-This lifecycle pattern is fundamental to all streaming applications. You'll implement each phase as you build through the steps.
+This lifecycle pattern is fundamental to all streaming applications. You'll implement each phase as you build through the following steps.
+
+In this step, we will add the **1. Application Init phase**. ADK requires three components initialized once at startup:
+
+1. **Agent** - Defines AI behavior (already created)
+2. **SessionService** - Stores conversation history
+3. **Runner** - Orchestrates streaming
 
 ### Activate Step 3
 
-Copy the step 3 source file to `main.py`:
+Stop the server with **Ctrl+C**, then copy the step 3 source file to `main.py`:
 
 ```bash
 cp step3_main.py main.py
 ```
+
+### Test Step 3
+
+Restart the server:
+
+```bash
+python -m uvicorn main:app --host 0.0.0.0 --port 8080
+```
+
+Open the demo page on the browser, make sure the app is Connected, and send a "Hello" message. You should see "ADK Ready! Model: gemini-live-2.5-flash-native-audio" in the chat, confirming the ADK components are initialized. Check the Terminal to make sure the server log doesn't output any errors.
+
+### Understanding the Server Code: Core Components
 
 Open `main.py` in the editor to examine the new code. Key additions:
 
 - **Load environment**: `load_dotenv()` loads `.env` before importing agent
 - **SessionService**: `InMemorySessionService()` stores conversation history
 - **Runner**: Orchestrates agent execution with session management
-
-### Test Step 3
-
-The `--reload` flag auto-detects file changes. Check the terminal—you should see uvicorn reload the app automatically. After the server reloads, send a message. You should see "ADK Ready! Model: gemini-live-2.5-flash-native-audio" in the chat.
-
-### Step 3 Checkpoint
-
-> **What you built**: You initialized the three core ADK components—Agent, SessionService, and Runner. These are created once at startup and shared across all connections. The app isn't ready for actual chat yet—we'll connect to the Live API in the next steps.
-
-### Understand the Components
 
 **step3_main.py:31-39**
 ```python
@@ -594,7 +600,7 @@ runner = Runner(
 - Thread-safe and memory-efficient
 - SessionService enables conversation continuity across reconnections
 
-### Client Code: Session ID Generation
+### Understanding the Client Code: Session ID Generation
 
 While `SessionService` and `Runner` are server-side, the client controls session identity:
 
@@ -607,6 +613,10 @@ const sessionId = "demo-session-" + Math.random().toString(36).substring(7);
 const ws_url = "ws://" + window.location.host + "/ws/" + userId + "/" + sessionId;
 ```
 
+### Step 3 Checkpoint
+
+> **What you built**: You initialized the three core ADK components—Agent, SessionService, and Runner. These are created once at startup and shared across all connections. The app isn't ready for actual chat yet—we'll connect to the Live API in the next steps.
+
 ---
 
 ## Step 4: Session Initialization (15 min)
@@ -615,7 +625,7 @@ Each WebSocket connection needs its own session. This is Phase 2 of the lifecycl
 
 ### Activate Step 4
 
-Copy the step 4 source file to `main.py`:
+Stop the server with **Ctrl+C**, then copy the step 4 source file to `main.py`:
 
 ```bash
 cp step4_main.py main.py
@@ -630,13 +640,15 @@ Open `main.py` in the editor to examine the new code. Key additions:
 
 ### Test Step 4
 
-Restart and test. Open a second browser tab with the same URL.
+Restart the server:
 
-### Step 4 Checkpoint
+```bash
+python -m uvicorn main:app --host 0.0.0.0 --port 8080
+```
 
-> **What you built**: You implemented Phase 2 of the lifecycle—session initialization. Each WebSocket connection now gets its own RunConfig, Session, and LiveRequestQueue. The `finally` block ensures proper cleanup when connections close.
+Open a second browser tab with the same URL to verify multiple sessions work.
 
-### Understand RunConfig
+### Understanding the Server Code: RunConfig
 
 **step4_main.py:56-61**
 ```python
@@ -675,7 +687,7 @@ One concept trips up many developers: ADK Session vs Live API session.
 - **ADK Session**: Persistent, lives in SessionService, survives restarts. User returns days later with history intact.
 - **Live API session**: Ephemeral, exists only during active `run_live()`. When the loop ends, it's destroyed—but ADK has already persisted the events.
 
-### Understand LiveRequestQueue
+### Understanding the Server Code: LiveRequestQueue
 
 **step4_main.py:76**
 ```python
@@ -694,6 +706,10 @@ The `LiveRequestQueue` is your primary interface for sending input to the model:
 | `send_activity_end()` | Signal user stopped | May trigger response |
 | `close()` | End the session | N/A |
 
+### Step 4 Checkpoint
+
+> **What you built**: You implemented Phase 2 of the lifecycle—session initialization. Each WebSocket connection now gets its own RunConfig, Session, and LiveRequestQueue. The `finally` block ensures proper cleanup when connections close.
+
 ---
 
 ## Step 5: Upstream Task (15 min)
@@ -702,7 +718,7 @@ Now we'll send text to the model using `LiveRequestQueue`.
 
 ### Activate Step 5
 
-Copy the step 5 source file to `main.py`:
+Stop the server with **Ctrl+C**, then copy the step 5 source file to `main.py`:
 
 ```bash
 cp step5_main.py main.py
@@ -718,7 +734,13 @@ Open `main.py` in the editor to examine the new code. Key additions:
 
 ### Test Step 5
 
-Restart and send a message. Check the terminal—you should see:
+Restart the server:
+
+```bash
+python -m uvicorn main:app --host 0.0.0.0 --port 8080
+```
+
+Send a message. Check the terminal—you should see:
 ```
 User said: Hello
 Sent to LiveRequestQueue
@@ -726,11 +748,7 @@ Sent to LiveRequestQueue
 
 The message goes to the model, but we're not receiving responses yet. That's next!
 
-### Step 5 Checkpoint
-
-> **What you built**: You implemented the upstream task that receives WebSocket messages and sends them to the model via `LiveRequestQueue.send_content()`. Messages are flowing to the Live API, but we're not receiving responses yet—that's next!
-
-### Understand the Upstream Flow
+### Understanding the Server Code: Upstream Flow
 
 **step5_main.py:75-86**
 ```python
@@ -751,7 +769,7 @@ live_request_queue.send_content(content)
 - `types.Content` - Structured text (triggers model response)
 - `types.Blob` - Binary data like audio/images (streams continuously)
 
-### Client Code: Sending Text Messages
+### Understanding the Client Code: Sending Text Messages
 
 The client sends text as JSON through the WebSocket:
 
@@ -802,6 +820,10 @@ User types → Form submit → JSON.stringify → WebSocket text frame
 
 The `type: "text"` field tells the server this is a text message (vs image or other types we'll add later).
 
+### Step 5 Checkpoint
+
+> **What you built**: You implemented the upstream task that receives WebSocket messages and sends them to the model via `LiveRequestQueue.send_content()`. Messages are flowing to the Live API, but we're not receiving responses yet—that's next!
+
 ---
 
 ## Step 6: Downstream Task (15 min)
@@ -810,7 +832,7 @@ Now the exciting part—receiving streaming responses from the model!
 
 ### Activate Step 6
 
-Copy the step 6 source file to `main.py`:
+Stop the server with **Ctrl+C**, then copy the step 6 source file to `main.py`:
 
 ```bash
 cp step6_main.py main.py
@@ -825,7 +847,13 @@ Open `main.py` in the editor to examine the new code. Key additions:
 
 ### Test Step 6
 
-Restart and try:
+Restart the server:
+
+```bash
+python -m uvicorn main:app --host 0.0.0.0 --port 8080
+```
+
+Try these interactions:
 
 1. Type "Hello, who are you?"
 2. Watch the response stream in word by word!
@@ -833,11 +861,7 @@ Restart and try:
 
 Open the Event Console (right panel) to see raw events.
 
-### Step 6 Checkpoint
-
-> **What you built**: You completed the bidirectional streaming loop! The downstream task uses `runner.run_live()` to receive events from the model and forward them to the client. You now have full text-based conversation with tool execution working.
-
-### Understand run_live()
+### Understanding the Server Code: run_live()
 
 **step6_main.py:82-93**
 ```python
@@ -880,7 +904,7 @@ The demo application includes an Event Console (right panel) that displays raw e
 
 Watch the Event Console as you interact—you'll see exactly how events flow in a streaming conversation.
 
-### Client Code: Receiving and Processing Events
+### Understanding the Client Code: Receiving and Processing Events
 
 The client handles all incoming events in `websocket.onmessage`:
 
@@ -985,6 +1009,10 @@ Let's trace a complete interaction to see how all the pieces work together. A us
 
 This entire flow takes under two seconds. The user experiences natural conversation, unaware of the LiveRequestQueue, Events, and session management happening beneath the surface.
 
+### Step 6 Checkpoint
+
+> **What you built**: You completed the bidirectional streaming loop! The downstream task uses `runner.run_live()` to receive events from the model and forward them to the client. You now have full text-based conversation with tool execution working.
+
 ---
 
 ## Step 7: Add Audio (15 min)
@@ -993,7 +1021,7 @@ Let's add bidirectional voice support—both speaking to the AI and hearing its 
 
 ### Activate Step 7
 
-Copy the step 7 source file to `main.py`:
+Stop the server with **Ctrl+C**, then copy the step 7 source file to `main.py`:
 
 ```bash
 cp step7_main.py main.py
@@ -1008,7 +1036,13 @@ Open `main.py` in the editor to examine the new code. Key additions:
 
 ### Test Step 7
 
-After the server reloads:
+Restart the server:
+
+```bash
+python -m uvicorn main:app --host 0.0.0.0 --port 8080
+```
+
+Test voice interaction:
 
 1. Click "Start Audio" button
 2. Allow microphone access
@@ -1016,10 +1050,6 @@ After the server reloads:
 4. Wait for the response—you should hear the AI speak back!
 
 You should see your speech transcribed in the chat (if using a model with transcription support), and hear the AI's audio response through your speakers.
-
-### Step 7 Checkpoint
-
-> **What you built**: You added bidirectional audio streaming! The upstream task now handles binary WebSocket frames containing PCM audio, sending them via `send_realtime()`. The model responds with audio that plays through the browser's AudioWorklet.
 
 ### Multimodal Capabilities
 
@@ -1064,7 +1094,7 @@ live_request_queue.send_realtime(audio_blob)
 
 **[VAD (Voice Activity Detection)](https://ai.google.dev/gemini-api/docs/live-guide#voice-activity-detection-vad)**: The Live API automatically detects when you stop speaking and triggers a response—no manual "end of turn" signal needed.
 
-### Client Code: Audio Capture with AudioWorklet
+### Understanding the Client Code: Audio Capture with AudioWorklet
 
 The frontend captures microphone audio using the [Web Audio API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Audio_API) with AudioWorklet for low-latency processing:
 
@@ -1159,7 +1189,7 @@ Microphone → MediaStream → AudioContext (16kHz resample)
 | `Float32 → Int16` | Convert Web Audio format to PCM |
 | Binary WebSocket frame | More efficient than base64 encoding |
 
-### Understand Audio Response Events
+### Understanding the Server Code: Audio Response Events
 
 Since we configured `response_modalities=["AUDIO"]`, the model returns audio in events:
 
@@ -1178,7 +1208,7 @@ The frontend's audio player worklet handles:
 2. Ring buffer for smooth playback
 3. 24kHz PCM to speaker output
 
-### Client Code: Audio Playback with Ring Buffer
+### Understanding the Client Code: Audio Playback with Ring Buffer
 
 The frontend plays audio using an AudioWorklet with a ring buffer for smooth, glitch-free playback:
 
@@ -1301,6 +1331,10 @@ Ring buffer visualization:
 
 The buffer absorbs timing variations between network arrival and audio playback, ensuring smooth output even with irregular packet delivery.
 
+### Step 7 Checkpoint
+
+> **What you built**: You added bidirectional audio streaming! The upstream task now handles binary WebSocket frames containing PCM audio, sending them via `send_realtime()`. The model responds with audio that plays through the browser's AudioWorklet.
+
 ---
 
 ## Step 8: Add Image Input (10 min)
@@ -1309,7 +1343,7 @@ Let's add camera/image support for multimodal AI.
 
 ### Activate Step 8
 
-Copy the step 8 source file to `main.py`:
+Stop the server with **Ctrl+C**, then copy the step 8 source file to `main.py`:
 
 ```bash
 cp step8_main.py main.py
@@ -1322,18 +1356,20 @@ Open `main.py` in the editor to examine the new code. Key additions:
 - **types.Blob for images**: Creates blob with `image/jpeg` MIME type
 - **send_realtime() for images**: Sends image same as audio
 
-### Test Image Input
+### Test Step 8
 
-After the server reloads:
+Restart the server:
+
+```bash
+python -m uvicorn main:app --host 0.0.0.0 --port 8080
+```
+
+Test image input:
 
 1. Click the camera button
 2. Allow camera access
 3. Capture an image
 4. Ask "What do you see in this image?"
-
-### Step 8 Checkpoint
-
-> **What you built**: You completed the full multimodal application! The server now handles text, audio, and image input through the same `LiveRequestQueue` interface. The model can see, hear, and respond with natural speech.
 
 ### Understand Image Format
 
@@ -1345,7 +1381,7 @@ After the server reloads:
 
 Images are sent the same way as audio—via `send_realtime()`. The model processes them alongside text and audio for multimodal understanding.
 
-### Client Code: Camera Capture and Image Sending
+### Understanding the Client Code: Camera Capture and Image Sending
 
 The frontend captures images from the camera using Canvas API and sends them as base64-encoded JSON:
 
@@ -1444,6 +1480,10 @@ For images sent infrequently (on user action), base64 overhead is acceptable. Th
 // Audio - binary frame (no JSON wrapper)
 [raw PCM bytes]
 ```
+
+### Step 8 Checkpoint
+
+> **What you built**: You completed the full multimodal application! The server now handles text, audio, and image input through the same `LiveRequestQueue` interface. The model can see, hear, and respond with natural speech.
 
 ---
 
