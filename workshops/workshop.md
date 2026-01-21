@@ -260,23 +260,14 @@ The architecture consists of three main layers:
 
 Let's start with the simplest possible WebSocket server that echoes messages back.
 
-### Activate Step 1
+### Run the Server
 
-Copy the step 1 source file to `main.py`:
+Copy the step 1 source file to `main.py` and start the server:
 
 ```bash
 cd ~/bidi-workshop/app
 cp step1_main.py main.py
 ```
-
-Open `main.py` in the editor to examine the code. Key components:
-
-- **FastAPI app**: Creates web server with WebSocket support
-- **Static files**: Serves frontend assets (HTML, CSS, JS)
-- **WebSocket endpoint**: Accepts connections at `/ws/{user_id}/{session_id}`
-- **Echo response**: Returns messages in ADK event format
-
-### Test Step 1
 
 Start the server:
 
@@ -307,6 +298,13 @@ You'll see the demo screen in your browser. Make sure the **Connected** indicato
 3. You should see "Echo: {"type": "text", "text": "Hello"}" in the chat
 
 ![Echo: hello](assets/echo_hello.png)
+
+Open `main.py` in the editor to examine the code. Key components:
+
+- **FastAPI app**: Creates web server with WebSocket support
+- **Static files**: Serves frontend assets (HTML, CSS, JS)
+- **WebSocket endpoint**: Accepts connections at `/ws/{user_id}/{session_id}`
+- **Echo response**: Returns messages in ADK event format
 
 ### Understanding the Server Code
 
@@ -555,15 +553,13 @@ In this step, we will add the **1. Application Init phase**. ADK requires three 
 2. **SessionService** - Stores conversation history
 3. **Runner** - Orchestrates streaming
 
-### Activate Step 3
+### Run the Server
 
-Stop the server with **Ctrl+C**, then copy the step 3 source file to `main.py`:
+Stop the server with **Ctrl+C**, then copy the step 3 source file and restart:
 
 ```bash
 cp step3_main.py main.py
 ```
-
-### Test Step 3
 
 Restart the server:
 
@@ -571,7 +567,7 @@ Restart the server:
 python -m uvicorn main:app --host 0.0.0.0 --port 8080
 ```
 
-Open the demo page on the browser, make sure the app is Connected, and send a "Hello" message. You should see "ADK Ready! Model: gemini-live-2.5-flash-native-audio" in the chat, confirming the ADK components are initialized. Check the Terminal to make sure the server log doesn't output any errors.
+Open the demo page on the browser, make sure the app is Connected, and send a "Hello" message. You should see **"ADK Ready! Model: gemini-live-2.5-flash-native-audio"** in the chat, confirming the ADK components are initialized. Check the Terminal to make sure the server log doesn't output any errors.
 
 ### Understanding the Server Code: Core ADK Components
 
@@ -628,15 +624,13 @@ const ws_url = "ws://" + window.location.host + "/ws/" + userId + "/" + sessionI
 
 Each WebSocket connection needs its own session. This is Phase 2 of the lifecycle.
 
-### Activate Step 4
+### Run the Server
 
-Stop the server with **Ctrl+C**, then copy the step 4 source file to `main.py`:
+Stop the server with **Ctrl+C**, then copy the step 4 source file and restart:
 
 ```bash
 cp step4_main.py main.py
 ```
-
-### Test Step 4
 
 Restart the server:
 
@@ -661,11 +655,11 @@ Each browser tab generates a unique `session_id`, allowing multiple concurrent c
 Open `main.py` in the editor to examine the new code. Key additions:
 
 - **RunConfig**: Configures streaming mode, response modalities, and transcription
-- **Session management**: Gets or creates session for conversation history
 - **LiveRequestQueue**: Creates the queue for sending input to the model
 - **Termination**: Closes the queue in `finally` block
+- **Session management**: Gets or creates session for conversation history
 
-### Understanding the Server Code: RunConfig
+### Understanding RunConfig
 
 `RunConfig` controls how the streaming session behaves—what modalities to use, whether to transcribe audio, and other runtime settings.
 
@@ -710,7 +704,7 @@ Session initialized with config: streaming_mode=<StreamingMode.BIDI: 'bidi'>
 
 ![RunConfig Configuration Options](assets/runconfig.png)
 
-### Understanding the Server Code: LiveRequestQueue
+### Understanding LiveRequestQueue
 
 The `LiveRequestQueue` is your primary interface for sending input to the model. Think of it as a mailbox where you drop messages, and ADK delivers them to the Live API.
 
@@ -813,23 +807,13 @@ sequenceDiagram
 
 Now we'll send text to the model using `LiveRequestQueue`.
 
-### Activate Step 5
+### Run the Server
 
-Stop the server with **Ctrl+C**, then copy the step 5 source file to `main.py`:
+Stop the server with **Ctrl+C**, then copy the step 5 source file and restart:
 
 ```bash
 cp step5_main.py main.py
 ```
-
-Open `main.py` in the editor to examine the new code. Key additions:
-
-- **upstream_task()**: Async function that receives WebSocket messages
-- **JSON parsing**: Extracts text from `{"type": "text", "text": "..."}` messages
-- **types.Content**: Creates ADK Content object with text part
-- **send_content()**: Sends text to the model (triggers immediate response)
-- **asyncio.gather()**: Runs upstream and downstream tasks concurrently
-
-### Test Step 5
 
 Restart the server:
 
@@ -845,28 +829,87 @@ Sent to LiveRequestQueue
 
 The message goes to the model, but we're not receiving responses yet. That's next!
 
-### Understanding the Server Code: Upstream Flow
+Open `main.py` in the editor to examine the new code. Key additions:
 
-**step5_main.py:75-86**
+- **upstream_task()**: Async function that receives WebSocket messages
+- **JSON parsing**: Extracts text from `{"type": "text", "text": "..."}` messages
+- **types.Content**: Creates ADK Content object with text part
+- **send_content()**: Sends text to the model (triggers immediate response)
+- **asyncio.gather()**: Runs upstream and downstream tasks concurrently
+
+### Understanding the Upstream Flow
+
+The upstream task handles the **client → model** direction. It runs as an infinite loop, waiting for WebSocket messages and forwarding them to the model via `LiveRequestQueue`:
+
+**step5_main.py:66-91**
 ```python
-# Parse JSON message from client
-json_message = json.loads(text_data)
-# {"type": "text", "text": "Hello"}
+async def upstream_task() -> None:
+    while True:
+        message = await websocket.receive()  # Wait for WebSocket message from the client
 
-# Create ADK Content object
-content = types.Content(
-    parts=[types.Part(text=user_text)]
-)
+        if "text" in message:
+            text_data = message["text"]
+            json_message = json.loads(text_data)  # Parse JSON
 
-# Send to model via queue
-live_request_queue.send_content(content)
+            if json_message.get("type") == "text":
+                user_text = json_message["text"]
+
+                # Create Content object and send to queue
+                content = types.Content(
+                    parts=[types.Part(text=user_text)]
+                )
+                live_request_queue.send_content(content)
 ```
 
-**Content vs Blob:**
-- `types.Content` - Structured text (triggers model response)
-- `types.Blob` - Binary data like audio/images (streams continuously)
+**From the client to FastAPI:**
+When a user enters a text message in the UI, the client sends it as JSON with a `type` field to identify the message kind:
+
+```javascript
+// Client sends this JSON string
+{"type": "text", "text": "Hello, how are you?"}
+```
+
+**From FastAPI to the upstream task:**
+FastAPI receives the WebSocket frame and passes it to `websocket.receive()` as a dictionary with either a `"text"` or `"bytes"` key depending on the frame type:
+
+```python
+# Text frame from client
+{"type": "websocket.receive", "text": '{"type": "text", "text": "Hello"}'}
+
+# Binary frame from client (audio)
+{"type": "websocket.receive", "bytes": b'\x00\x01\x02...'}
+```
+
+**From the upstream task to LiveRequestQueue:**
+The upstream task parses the JSON, extracts the user's text, wraps it in a `types.Content` object, and sends it to the model via `live_request_queue.send_content()`. This signals to the model that the user has finished their input and expects a response.
+
+**Why `types.Content`?** The ADK uses Gemini API's `genai.types` for all data structures. `Content` represents a complete message with one or more `Part` objects (text, images, etc.). This is the same format used throughout the Gemini API. In Bidi-streaming, you typically use a single text `Part`—images and audio are sent separately via `send_realtime()` as `Blob` objects.
+
+**Content vs Blob - When to use each:**
+
+| Method | Data Type | Behavior |
+|--------|-----------|----------|
+| `send_content()` | `types.Content` | Structured text - signals "user finished speaking", triggers immediate model response |
+| `send_realtime()` | `types.Blob` | Binary streams (audio/images) - continuous flow, model uses VAD to detect when to respond |
+
+**Concurrent execution with `asyncio.gather()`:**
+
+**step5_main.py:101**
+```python
+await asyncio.gather(upstream_task(), downstream_task())
+```
+
+This runs both tasks simultaneously (we'll implement `downstream_task()` in the next step):
+- **upstream_task**: Receives from WebSocket → sends to model
+- **downstream_task**: Receives from model → sends to WebSocket
+
+If either task raises an exception, both are cancelled—ensuring clean shutdown when the client disconnects.
 
 ### Understanding the Client Code: Sending Text Messages
+
+Now that we've seen how the server handles incoming messages, let's look at the client side. The frontend JavaScript captures user input and sends it through the WebSocket connection.
+
+**Why JSON with a type field?** The client sends text and images as JSON with a `type` field, allowing the server to route each message to the appropriate handler. This pattern is extensible—you could add other message types like control commands (e.g., `{"type": "clear_history"}`) without changing the protocol. Audio is different—it's sent as raw binary WebSocket frames for efficiency (we'll see this in Step 7).
 
 The client sends text as JSON through the WebSocket:
 
@@ -881,41 +924,9 @@ function sendMessage(message) {
         websocket.send(jsonMessage);  // Sends as text frame
     }
 }
-
-// app.js:734-752 - Form submission handler
-messageForm.onsubmit = function(e) {
-    e.preventDefault();  // Don't reload page
-    const message = messageInput.value.trim();
-
-    if (message) {
-        // Optimistic UI update - show message immediately
-        const userBubble = createMessageBubble(message, true);
-        messagesDiv.appendChild(userBubble);
-
-        messageInput.value = "";  // Clear input
-        sendMessage(message);      // Send to server
-    }
-};
 ```
 
-**Key patterns:**
-
-| Pattern | Purpose |
-|---------|---------|
-| `JSON.stringify()` | Package text with type identifier |
-| `websocket.send(string)` | Send as WebSocket text frame |
-| `e.preventDefault()` | Stop form from reloading page |
-| Optimistic update | Show user message before server confirms |
-
-**Message flow:**
-
-```
-User types → Form submit → JSON.stringify → WebSocket text frame
-    → Server receives → json.loads() → types.Content
-    → live_request_queue.send_content()
-```
-
-The `type: "text"` field tells the server this is a text message (vs image or other types we'll add later).
+The `sendMessage()` function packages text into JSON and sends it via WebSocket. It checks that the connection is open before sending.
 
 ### Step 5 Checkpoint
 
@@ -927,22 +938,13 @@ The `type: "text"` field tells the server this is a text message (vs image or ot
 
 Now the exciting part—receiving streaming responses from the model!
 
-### Activate Step 6
+### Run the Server
 
-Stop the server with **Ctrl+C**, then copy the step 6 source file to `main.py`:
+Stop the server with **Ctrl+C**, then copy the step 6 source file and restart:
 
 ```bash
 cp step6_main.py main.py
 ```
-
-Open `main.py` in the editor to examine the new code. Key additions:
-
-- **runner.run_live()**: Async generator that yields events from the model
-- **Event serialization**: `event.model_dump_json()` converts events to JSON
-- **WebSocket forwarding**: Sends each event to the client immediately
-- **Error handling**: Catches exceptions and ensures queue is closed
-
-### Test Step 6
 
 Restart the server:
 
@@ -957,6 +959,13 @@ Try these interactions:
 3. Try "Search for the weather in Tokyo"—watch tool execution!
 
 Open the Event Console (right panel) to see raw events.
+
+Open `main.py` in the editor to examine the new code. Key additions:
+
+- **runner.run_live()**: Async generator that yields events from the model
+- **Event serialization**: `event.model_dump_json()` converts events to JSON
+- **WebSocket forwarding**: Sends each event to the client immediately
+- **Error handling**: Catches exceptions and ensures queue is closed
 
 ### Understanding the Server Code: run_live()
 
@@ -1116,22 +1125,13 @@ This entire flow takes under two seconds. The user experiences natural conversat
 
 Let's add bidirectional voice support—both speaking to the AI and hearing its responses.
 
-### Activate Step 7
+### Run the Server
 
-Stop the server with **Ctrl+C**, then copy the step 7 source file to `main.py`:
+Stop the server with **Ctrl+C**, then copy the step 7 source file and restart:
 
 ```bash
 cp step7_main.py main.py
 ```
-
-Open `main.py` in the editor to examine the new code. Key additions:
-
-- **Binary message handling**: Detects `"bytes"` in WebSocket message
-- **types.Blob**: Creates audio blob with `audio/pcm;rate=16000` MIME type
-- **send_realtime()**: Streams audio continuously (VAD triggers response)
-- **Warning filters**: Suppresses noisy authentication warnings
-
-### Test Step 7
 
 Restart the server:
 
@@ -1147,6 +1147,13 @@ Test voice interaction:
 4. Wait for the response—you should hear the AI speak back!
 
 You should see your speech transcribed in the chat (if using a model with transcription support), and hear the AI's audio response through your speakers.
+
+Open `main.py` in the editor to examine the new code. Key additions:
+
+- **Binary message handling**: Detects `"bytes"` in WebSocket message
+- **types.Blob**: Creates audio blob with `audio/pcm;rate=16000` MIME type
+- **send_realtime()**: Streams audio continuously (VAD triggers response)
+- **Warning filters**: Suppresses noisy authentication warnings
 
 ### Multimodal Capabilities
 
@@ -1438,22 +1445,13 @@ The buffer absorbs timing variations between network arrival and audio playback,
 
 Let's add camera/image support for multimodal AI.
 
-### Activate Step 8
+### Run the Server
 
-Stop the server with **Ctrl+C**, then copy the step 8 source file to `main.py`:
+Stop the server with **Ctrl+C**, then copy the step 8 source file and restart:
 
 ```bash
 cp step8_main.py main.py
 ```
-
-Open `main.py` in the editor to examine the new code. Key additions:
-
-- **Image message handling**: Detects `{"type": "image", ...}` JSON messages
-- **Base64 decoding**: `base64.b64decode()` converts image data
-- **types.Blob for images**: Creates blob with `image/jpeg` MIME type
-- **send_realtime() for images**: Sends image same as audio
-
-### Test Step 8
 
 Restart the server:
 
@@ -1467,6 +1465,13 @@ Test image input:
 2. Allow camera access
 3. Capture an image
 4. Ask "What do you see in this image?"
+
+Open `main.py` in the editor to examine the new code. Key additions:
+
+- **Image message handling**: Detects `{"type": "image", ...}` JSON messages
+- **Base64 decoding**: `base64.b64decode()` converts image data
+- **types.Blob for images**: Creates blob with `image/jpeg` MIME type
+- **send_realtime() for images**: Sends image same as audio
 
 ### Understand Image Format
 
