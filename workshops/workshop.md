@@ -952,13 +952,24 @@ Restart the server:
 python -m uvicorn main:app --host 0.0.0.0 --port 8080
 ```
 
-Try these interactions:
+Try these three scenarios:
 
-1. Type "Hello, who are you?"
-2. Watch the response stream in word by word!
-3. Try "Search for the weather in Tokyo"—watch tool execution!
+**Scenario 1: Watch streaming text events**
+1. Type "Hello" and send
+2. Open the Event Console (right panel) and watch events arrive word by word
+3. Notice each event contains a small piece of text that builds up the response
 
-Open the Event Console (right panel) to see raw events.
+**Scenario 2: Watch tool execution**
+1. Type "Search for the weather in Tokyo"
+2. Watch the Event Console—you'll see tool call events followed by tool response events
+3. The model uses Google Search to get real-time weather data
+
+**Scenario 3: Test interruption**
+1. Type "Explain the history of Japan in detail"
+2. While the model is responding, type "Stop" and send it
+3. Watch the Event Console—you'll see an `interrupted` event, then the model starts responding to your new message
+
+![Interrupt](assets/interrupt.png)
 
 Open `main.py` in the editor to examine the new code. Key additions:
 
@@ -969,50 +980,49 @@ Open `main.py` in the editor to examine the new code. Key additions:
 
 ### Understanding the Server Code: run_live()
 
-**step6_main.py:82-93**
+**step6_main.py:78-93**
 ```python
-async for event in runner.run_live(
-    user_id=user_id,              # Identifies the user
-    session_id=session_id,        # Identifies the session
-    live_request_queue=live_request_queue,  # Input channel
-    run_config=run_config,        # Streaming configuration
-):
-    # Events arrive as they're generated - true streaming!
-    event_json = event.model_dump_json(exclude_none=True, by_alias=True)
-    await websocket.send_text(event_json)
+async def downstream_task() -> None:
+    async for event in runner.run_live(
+        user_id=user_id,              # Identifies the user
+        session_id=session_id,        # Identifies the session
+        live_request_queue=live_request_queue,  # Input channel
+        run_config=run_config,        # Streaming configuration
+    ):
+        # Serialize event to JSON
+        event_json = event.model_dump_json(exclude_none=True, by_alias=True)
+
+        # Forward to client
+        await websocket.send_text(event_json)
 ```
 
-**run_live() is an async generator** that yields events in real-time:
+**run_live() is an async generator** that yields `Event` objects as they arrive from the model. Unlike traditional request-response APIs where you wait for the complete response, `run_live()` streams events incrementally—you receive each word or audio chunk as it's generated.
+
+The `async for` loop processes events one at a time:
+- Each iteration yields a single `Event` object
+- The loop continues until the session ends or an error occurs
+- Events arrive in real-time, enabling low-latency streaming
+
+**Common event types:**
 
 | Event Type | Field | Description |
 |------------|-------|-------------|
 | Text content | `event.content.parts[0].text` | Model's text response |
-| Audio content | `event.content.parts[0].inline_data` | Model's audio response |
-| Turn complete | `event.turn_complete` | Model finished responding |
-| Interrupted | `event.interrupted` | User interrupted model |
+| Audio content | `event.content.parts[0].inline_data` | Model's audio response (audio chunk) |
+| Turn complete | `event.turn_complete` | Model finished responding to current input |
+| Interrupted | `event.interrupted` | User interrupted model (e.g., spoke while model was responding) |
 
 ![Comprehensive Summary of ADK Live Event Handling](assets/run_live.png)
 
-### The Event Console
+**Serializing events with `model_dump_json()`:** In this demo, we forward events directly to the client rather than examining them in the downstream task. The client-side JavaScript handles parsing and display. ADK events are Pydantic models, so we use `model_dump_json()` to convert them to JSON strings:
 
-The demo application includes an Event Console (right panel) that displays raw events as they arrive. This is invaluable for debugging and understanding the streaming flow.
+- `exclude_none=True` - Omits fields with `None` values, reducing payload size
+- `by_alias=True` - Uses JSON field names (e.g., `inlineData` instead of `inline_data`) for JavaScript compatibility
 
-| Icon | Event Type | Description |
-|------|------------|-------------|
-| 📝 | Text content | Model's text response chunks |
-| 🔊 | Audio content | Model's audio response chunks |
-| 🎤 | Input transcription | User's speech converted to text |
-| 📜 | Output transcription | Model's audio converted to text |
-| 🛠️ | Tool call | Model requesting to use a tool |
-| ✅ | Tool response | Result from tool execution |
-| ⏹️ | Turn complete | Model finished responding |
-| ⚡ | Interrupted | User interrupted the model |
-
-Watch the Event Console as you interact—you'll see exactly how events flow in a streaming conversation.
 
 ### Understanding the Client Code: Receiving and Processing Events
 
-The client handles all incoming events in `websocket.onmessage`:
+The client handles all incoming ADK events in `websocket.onmessage`:
 
 ```javascript
 // app.js:341-693 - Event handler (simplified)
@@ -1080,44 +1090,9 @@ Event 4: {"turnComplete": true}                          → Done!
 
 Each event appends text to the same bubble, creating the "typing" effect.
 
-### Example: Complete Voice Search Flow
-
-Let's trace a complete interaction to see how all the pieces work together. A user asks: *"What's the weather in Tokyo?"*
-
-```
-1. Audio Capture → Queue
-   Browser captures microphone at 16kHz, converts to PCM chunks.
-   Server receives binary frames and calls:
-   live_request_queue.send_realtime(audio_blob)
-
-2. VAD Detection
-   Live API's Voice Activity Detection notices user stopped speaking.
-   Triggers processing of accumulated audio.
-
-3. Transcription Event
-   Event arrives: input_transcription.text = "What's the weather in Tokyo?"
-   Display in chat UI so users see their words recognized.
-
-4. Tool Execution
-   Model decides to call google_search tool.
-   Tool call event arrives → ADK executes automatically → Tool response event follows.
-
-5. Audio Response
-   Model generates spoken response.
-   Audio chunks arrive as events with inline_data.
-   Client feeds them to AudioWorklet for playback:
-   "The weather in Tokyo is currently 22 degrees and sunny."
-
-6. Turn Complete
-   Event arrives with turn_complete=True.
-   UI removes "..." indicator—agent finished talking.
-```
-
-This entire flow takes under two seconds. The user experiences natural conversation, unaware of the LiveRequestQueue, Events, and session management happening beneath the surface.
-
 ### Step 6 Checkpoint
 
-> **What you built**: You completed the bidirectional streaming loop! The downstream task uses `runner.run_live()` to receive events from the model and forward them to the client. You now have full text-based conversation with tool execution working.
+> **What you built**: You completed the bidirectional streaming loop! The downstream task uses `runner.run_live()` to receive events from the model and forward them to the client. You now have full text-based conversation with streaming responses, tool execution (Google Search), and interruption handling.
 
 ---
 
