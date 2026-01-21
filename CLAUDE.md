@@ -236,6 +236,16 @@ flake8 .
 6. Verify WebSocket connection handling
 7. Run code-lint skill before committing (see "Lint the code" above)
 
+### Updating Workshop src.tar.gz
+
+When modifying files in `workshops/src/`, always update the `src.tar.gz` archive:
+
+```bash
+cd workshops/src && tar -czvf ../src.tar.gz .
+```
+
+**IMPORTANT**: Run the command from inside the `src/` directory to avoid including the `src/` prefix in the archive. The archive should extract files directly (e.g., `app/`, `pyproject.toml`) without a parent directory wrapper.
+
 ### Running Documentation Reviews
 
 Use the `docs-lint` skill to perform comprehensive documentation reviews:
