@@ -67,30 +67,27 @@ async def websocket_endpoint(
         """Receives messages from WebSocket and sends to LiveRequestQueue."""
         print("Upstream task started")
 
-        try:
-            while True:
-                message = await websocket.receive()
+        while True:
+            message = await websocket.receive()
 
-                if "text" in message:
-                    text_data = message["text"]
-                    json_message = json.loads(text_data)
+            if "text" in message:
+                text_data = message["text"]
+                json_message = json.loads(text_data)
 
-                    if json_message.get("type") == "text":
-                        user_text = json_message["text"]
-                        print(f"User said: {user_text}")
+                if json_message.get("type") == "text":
+                    user_text = json_message["text"]
+                    print(f"User said: {user_text}")
 
-                        # Create Content object and send to queue
-                        content = types.Content(
-                            parts=[types.Part(text=user_text)]
-                        )
-                        live_request_queue.send_content(content)
-                        print("Sent to LiveRequestQueue")
+                    # Create Content object and send to queue
+                    content = types.Content(
+                        parts=[types.Part(text=user_text)]
+                    )
+                    live_request_queue.send_content(content)
+                    print("Sent to LiveRequestQueue")
 
-                elif "bytes" in message:
-                    # Audio handling will come later
-                    print(f"Received audio: {len(message['bytes'])} bytes")
-        except WebSocketDisconnect:
-            print("Client disconnected")
+            elif "bytes" in message:
+                # Audio handling will come later
+                print(f"Received audio: {len(message['bytes'])} bytes")
 
     async def downstream_task() -> None:
         """Placeholder - will receive events from run_live()."""
@@ -102,6 +99,8 @@ async def websocket_endpoint(
     try:
         # Run both tasks concurrently
         await asyncio.gather(upstream_task(), downstream_task())
+    except WebSocketDisconnect:
+        print("Client disconnected")
     finally:
         live_request_queue.close()
         print("Session terminated")

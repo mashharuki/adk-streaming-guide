@@ -736,7 +736,7 @@ live_request_queue = LiveRequestQueue()
 
 **Why `close()` matters:** Always call `close()` in a `finally` block to properly terminate the Live API session and release resources. Forgetting to close can leave orphaned sessions counting against your quota.
 
-**step4_main.py:103-108** - Always close in `finally`:
+**step4_main.py:101-108** - Always close in `finally`:
 ```python
 except WebSocketDisconnect:
     print("Client disconnected")
@@ -846,28 +846,27 @@ Open `main.py` in the editor to examine the new code. Key additions:
 
 The upstream task handles the **client → model** direction. It runs as an infinite loop, waiting for WebSocket messages and forwarding them to the model via `LiveRequestQueue`:
 
-**step5_main.py:66-93**
+**step5_main.py:66-90**
 ```python
 async def upstream_task() -> None:
-    try:
-        while True:
-            message = await websocket.receive()  # Wait for WebSocket message from the client
+    while True:
+        message = await websocket.receive()  # Wait for WebSocket message from the client
 
-            if "text" in message:
-                text_data = message["text"]
-                json_message = json.loads(text_data)  # Parse JSON
+        if "text" in message:
+            text_data = message["text"]
+            json_message = json.loads(text_data)  # Parse JSON
 
-                if json_message.get("type") == "text":
-                    user_text = json_message["text"]
+            if json_message.get("type") == "text":
+                user_text = json_message["text"]
 
-                    # Create Content object and send to queue
-                    content = types.Content(
-                        parts=[types.Part(text=user_text)]
-                    )
-                    live_request_queue.send_content(content)
-    except WebSocketDisconnect:
-        print("Client disconnected")
+                # Create Content object and send to queue
+                content = types.Content(
+                    parts=[types.Part(text=user_text)]
+                )
+                live_request_queue.send_content(content)
 ```
+
+When the client disconnects, `websocket.receive()` raises `WebSocketDisconnect`. The exception propagates up to `asyncio.gather()`, which cancels both tasks and reaches the `finally` block where cleanup happens.
 
 **From the client to FastAPI:**
 When a user enters a text message in the UI, the client sends it as JSON with a `type` field to identify the message kind:
@@ -902,16 +901,22 @@ The upstream task parses the JSON, extracts the user's text, wraps it in a `type
 
 **Concurrent execution with `asyncio.gather()`:**
 
-**step5_main.py:104**
+**step5_main.py:99-106**
 ```python
-await asyncio.gather(upstream_task(), downstream_task())
+try:
+    await asyncio.gather(upstream_task(), downstream_task())
+except WebSocketDisconnect:
+    print("Client disconnected")
+finally:
+    live_request_queue.close()
+    print("Session terminated")
 ```
 
 This runs both tasks simultaneously (we'll implement `downstream_task()` in the next step):
 - **upstream_task**: Receives from WebSocket → sends to model
 - **downstream_task**: Receives from model → sends to WebSocket
 
-If either task raises an exception, both are cancelled—ensuring clean shutdown when the client disconnects.
+When the client disconnects, `WebSocketDisconnect` propagates from `upstream_task`, canceling both tasks. The `finally` block ensures cleanup always happens.
 
 ### Understanding the Client Code: Sending Text Messages
 
@@ -983,7 +988,7 @@ Open `main.py` in the editor to examine the new code. Key additions:
 
 ### Understanding the Server Code: run_live()
 
-**step6_main.py:81-96**
+**step6_main.py:78-93**
 ```python
 async def downstream_task() -> None:
     async for event in runner.run_live(
@@ -1134,7 +1139,7 @@ Open `main.py` in the editor to examine the new code. Key additions:
 - **types.Blob**: Creates audio blob with `audio/pcm;rate=16000` MIME type
 - **send_realtime()**: Streams audio continuously (VAD triggers response)
 
-**step7_main.py:86-98** - Binary message handling:
+**step7_main.py:85-97** - Binary message handling:
 ```python
 # Handle binary messages (audio)
 elif "bytes" in message:
@@ -1466,7 +1471,7 @@ Open `main.py` in the editor to examine the new code.
 
 ### Understanding the Server Code: Handling Image Input
 
-**Handling image messages (step8_main.py:88-103):**
+**Handling image messages (step8_main.py:87-102):**
 
 The upstream task detects image messages by checking `type: "image"` in the JSON. It decodes the base64 image data and sends it to the model via `send_realtime()`—the same method used for audio.
 

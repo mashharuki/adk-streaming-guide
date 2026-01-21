@@ -102,7 +102,7 @@ Gemini Live API上で直接構築することもできますが、ADKが複雑�
 - 割り込みを自然に処理する
 - Google Searchなどのツールを使用する
 
-ドキュメントを読むだけではなく、**各コンポーネントをステップバイステップで調べ**、段階的に構築しながらピースがどのように組み合わさるかを理解します。
+ドキュメントを読むだけではなく、**各コンポーネントをステップバイステップで調べ**、段階的に構築しながらそれらをどのように組み合わせていくかを理解します。
 
 ![ADK Bidi-streaming デモ](../docs/assets/bidi-demo-screen.png)
 
@@ -128,11 +128,6 @@ Gemini Live API上で直接構築することもできますが、ADKが複雑�
 - [課金が有効](https://cloud.google.com/billing/docs/how-to/modify-project)なGoogle Cloudアカウント
 - 基本的なPythonと非同期プログラミング（async/await）の知識
 - マイクとWebカメラにアクセスできるウェブブラウザ（Chrome推奨）
-
-### 所要時間
-
-- **フルワークショップ**: 約90分
-- **クイックバージョン**（ステップ1-4のみ）: 約45分
 
 ---
 
@@ -191,11 +186,11 @@ bidi-workshop/
         └── js/                       # WebSocket、音声キャプチャ/再生
 ```
 
-各`stepN_main.py`ファイルは、そのステップの完全な動作バージョンです。使用するには`main.py`にコピーします：`cp step1_main.py main.py`
+`step1_main.py`から`step8_main.py`までの各ファイルは、それぞれのステップで使用する`main.py`ファイルです。
 
 **ステップ3: 環境変数を設定**
 
-テンプレートファイルをコピーし、Google CloudプロジェクトIDで編集します：
+テンプレートファイルをコピーします：
 
 ```bash
 cd ~/bidi-workshop/app
@@ -283,7 +278,7 @@ cd ~/bidi-workshop/app
 python -m uvicorn main:app --host 0.0.0.0 --port 8080
 ```
 
-以下が表示されるはずです：
+以下のログが表示されるはずです：
 
 ```
 INFO:     Uvicorn running on http://0.0.0.0:8080 (Press CTRL+C to quit)
@@ -339,7 +334,7 @@ async def websocket_endpoint(
     await websocket.accept()
 ```
 
-`@app.websocket`デコレータはWebSocketエンドポイントを作成します。パスパラメータ`{user_id}`と`{session_id}`はURLから抽出され、関数に渡されます。`websocket.accept()`を呼び出すとWebSocketハンドシェイクが完了します。
+`@app.websocket`デコレータによりWebSocketエンドポイントが作成されます。パスパラメータ`{user_id}`と`{session_id}`はURLから抽出され、引数として渡されます。`websocket.accept()`を呼び出すとWebSocketハンドシェイクが完了します。
 
 **step1_main.py:44-50** - ADKイベント形式でエコー応答：
 ```python
@@ -352,18 +347,17 @@ await websocket.send_text(json.dumps(response))
 await websocket.send_text(json.dumps({"turnComplete": True}))
 ```
 
-この時点では、ADK機能をまだ使用せず、入力メッセージをエコーバックしているだけです。ただし、応答はADKのイベント形式に従っています：テキスト応答は`content.parts[].text`、応答完了のシグナルは`turnComplete: true`です。このイベント形式についてはステップ6で詳しく探ります。フロントエンドはすでにこの形式を理解しているため、エコーがチャットメッセージとして表示されます。
+この時点では、ADKの機能をまだ使用せず、入力メッセージをエコーバックしているだけです。ただし、応答の内容はADKのイベント形式に従っています：テキスト応答は`content.parts[].text`、応答完了のシグナルは`turnComplete: true`です。このイベント形式についてはステップ6で詳しく解説します。クライアントはあらかじめこのイベント形式の応答を処理するよう記述されているため、エコーバックされたメッセージがチャットメッセージとして表示されます。
 
 ### イベントコンソールを理解する
 
-デモUIには、画面右側に**Event Console**パネルがあります。これはサーバーから到着する生のADKイベントをリアルタイムで表示する強力なデバッグツールです。
+デモUIには、画面右側に**Event Console**パネルがあります。これはサーバーから到着する生のADKイベントをリアルタイムで表示するデバッグツールです。
 
 **Event Consoleが表示するもの:**
 
 - サーバーから送信されるすべてのイベント（JSON形式）
-- クイックスキャン用のアイコンで識別されるイベントタイプ
-- イベントのタイミングとレイテンシを理解するためのタイムスタンプ
-- 展開して検査できる完全なイベントペイロード
+- イベントのタイミングを表すタイムスタンプ
+- イベントのペイロード全体
 
 **イベントタイプアイコン:**
 
@@ -373,23 +367,20 @@ await websocket.send_text(json.dumps({"turnComplete": True}))
 | 🔊 | 音声コンテンツ | モデルの音声応答チャンク |
 | 🎤 | 入力トランスクリプション | ユーザーの音声をテキストに変換 |
 | 📜 | 出力トランスクリプション | モデルの音声をテキストに変換 |
-| 🛠️ | ツール呼び出し | モデルがツール使用をリクエスト |
-| ✅ | ツール応答 | ツール実行の結果 |
 | ⏹️ | ターン完了 | モデルが応答を完了 |
 | ⚡ | 割り込み | ユーザーがモデルを割り込み |
 
 **使い方:**
 
 1. **表示切り替え**: 「Event Console」ヘッダーまたはトグルボタンをクリックしてパネルの表示/非表示を切り替え
-2. **イベントをクリア**: テスト間でコンソールをリセットするにはクリアボタンを使用
-3. **イベントを検査**: 任意のイベントをクリックして完全なJSONペイロードを表示
-4. **メッセージフローを追跡**: イベントが順番に到着するのを観察してストリーミングライフサイクルを理解
+2. **イベントをクリア**: コンソールをリセット
+3. **ペイロードを表示**: イベントをクリックしてJSONペイロード全体を表示
 
 このステップでは、送信するメッセージごとに2つのイベントが表示されます：
 1. エコー応答を含むコンテンツイベント
 2. 応答完了を示す`turnComplete`イベント
 
-ワークショップを進めるにつれ、トランスクリプション、ツール呼び出し、音声チャンクなど、より多くのイベントタイプが表示され、ADKストリーミングが内部でどのように機能するかを可視化できます。
+ワークショップを進めるにつれ、トランスクリプション、音声チャンクなど、より多くのイベントタイプが表示され、ADKストリーミングが内部でどのように機能するかを可視化できます。
 
 ### クライアントコードを理解する: WebSocket接続
 
@@ -428,7 +419,7 @@ function connectWebsocket() {
 connectWebsocket();
 ```
 
-**主要な概念:**
+**キーポイント:**
 
 | 概念 | 目的 |
 |------|------|
@@ -438,14 +429,14 @@ connectWebsocket();
 | `onmessage` | すべてのサーバーイベント（テキスト、音声、トランスクリプション）を受信 |
 | 自動再接続 | ネットワーク中断を適切に処理 |
 
-**なぜREST APIを使わないのか？** 従来のREST APIはリクエスト・レスポンスパターンを使用します—リクエストを送信し、完全な応答を待ちます。ストリーミングAIでは、サーバーがイベントを生成されるままにプッシュする必要があります。WebSocketとSSE（Server-Sent Events）の両方がこれを解決します：
+**なぜREST APIを使わないのか？** 従来のREST APIは、クライアントがリクエストを送信したら全ての応答が届くまで待機する、リクエスト・レスポンスパターンを使用します。一方、ストリーミングAIでは、サーバーがイベントを生成された時点でリアルタイムに配信します。こうしたストリーミング通信を行うには、REST APIに代わりWebSocketやSSE（Server-Sent Events）等のストリーミングプロトコルを利用します：
 
 | プロトコル | 長所 | 短所 |
 |------------|------|------|
 | **WebSocket** | 双方向、バイナリデータ（音声/画像）サポート、低レイテンシ | プロキシ/ロードバランサーでの設定が複雑 |
 | **SSE** | シンプル、HTTP上で動作、プロキシサポートが良好 | 双方向ストリーミングには2つのエンドポイントが必要、バイナリデータにはbase64エンコーディングが必要 |
 
-このワークショップでは双方向音声ストリーミングにWebSocketを使用しますが、テキストのみのアプリケーションにはSSEを選択することもできます。
+このワークショップではWebSocketを使用しますが、実際のアプリケーション開発では用途に応じてSSEを選択することもできます。
 
 ### ステップ1チェックポイント
 
@@ -486,12 +477,12 @@ agent = Agent(
 
 | パラメータ | 目的 |
 |-----------|------|
-| `name` | ログ、デバッグ、マルチエージェントルーティング用の識別子 |
+| `name` | エージェントの識別名。ログ、デバッグ、マルチエージェントルーティング等に利用します |
 | `model` | 使用するGeminiモデル（下記のモデルアーキテクチャを参照） |
-| `instruction` | エージェントの個性と動作を形作るシステムプロンプト |
+| `instruction` | エージェントの役割と動作を指示するプロンプト |
 | `tools` | 会話中にエージェントが呼び出せるツールのリスト |
 
-エージェントは**ステートレス**です—動作を定義しますが、会話状態は保持しません。同じエージェントインスタンスがすべてのユーザーに対応します。
+エージェントのコードは、その振る舞いをステートレスに記述したものです。クライアントとの会話状態はエージェントの中には保持しません。そのため、ひとつのエージェントインスタンスがすべてのセッションの実行に利用されます。
 
 ### google_searchツール
 
@@ -507,11 +498,11 @@ from google.adk.tools import google_search
 2. ADKが自動的に検索を実行し、結果をモデルに返す
 3. モデルが結果を自然な応答に合成
 
-> **注意**: エージェントはまだADKと統合されていないため、このステップではツール呼び出しをテストできません。ステップ6で双方向ストリーミングが完成したら試せます—「東京の天気を検索して」と聞いて、Event Consoleでツール実行フローを観察してください。
+> **注意**: エージェントはまだADKと統合されていないため、このステップではツール呼び出しをテストできません。ステップ6で双方向ストリーミングが完成したら試せます。
 
 ### Live APIモデルを選択
 
-`model`パラメータは、エージェントを駆動するLive APIモデルを決定します。音声AIには根本的に異なる2つのアーキテクチャが利用可能です：
+`model`パラメータは、エージェントを駆動するLive APIモデルを決定します。Live APIモデルは、2種類のアーキテクチャに分類されます：
 
 **Native Audioモデル**は、内部で中間テキストを生成せずにエンドツーエンドで音声を処理します。より自然なイントネーションの音声を生成できるほか、複数種類の音声からの選択、感情的対話（感情適応）やプロアクティビティ（モデル主導の応答）などの高度な機能が利用できます。Vertex AIにおける現在のモデルは`gemini-live-2.5-flash-native-audio`です。
 
@@ -524,7 +515,7 @@ from google.adk.tools import google_search
 | 高度な機能 | 感情的対話、プロアクティビティ | 限定的 |
 | ツール実行 | 場合により予測しにくいケースあり | より信頼性が高い |
 
-**最新のサポートモデルを確認:**
+最新のサポートモデルは以下ページで確認できます:
 
 - [Gemini Live APIモデル](https://ai.google.dev/gemini-api/docs/models#live-models) — Google AI Studio（**Gemini 2.5 Flash Live**を参照）
 - [Vertex AI Live APIモデル](https://cloud.google.com/vertex-ai/generative-ai/docs/live-api#supported-models) — Google Cloud
@@ -545,9 +536,9 @@ from google.adk.tools import google_search
 
 | フェーズ | タイミング | 何が起こるか |
 |----------|-----------|--------------|
-| **1. アプリケーション初期化** | サーバー起動時 | Agent、SessionService、Runnerを作成（一度、共有） |
+| **1. アプリケーション初期化** | サーバー起動時 | Agent、SessionService、Runnerを作成（一度だけ作成し、アプリ内で共有） |
 | **2. セッション初期化** | WebSocket接続時 | RunConfig作成、Session取得/作成、LiveRequestQueue作成 |
-| **3. Bidi-streaming** | アクティブな会話 | 並行するアップストリーム（入力）とダウンストリーム（イベント）タスク |
+| **3. Bidi-streaming** | アクティブな会話 | アップストリーム（入力）とダウンストリーム（イベント）タスク を並行処理|
 | **4. 終了** | 接続クローズ時 | LiveRequestQueueをクローズ、リソースをクリーンアップ |
 
 このライフサイクルパターンはすべてのストリーミングアプリケーションの基本です。以下のステップで各フェーズを実装していきます。
@@ -664,7 +655,7 @@ Created new session: demo-session-xoamfa
 
 ### RunConfigを理解する
 
-`RunConfig`は、使用するモダリティ、音声を書き起こし（transcribe）するかどうか、その他のランタイム設定をセッションごとに指定するためのAPIです。
+`RunConfig`は、モデルの出力メッセージのモダリティ（テキストもしくは音声）設定や、音声書き起こし（transcribe）設定、その他のランタイム設定をセッションごとに指定するためのAPIです。
 
 **step4_main.py:56-61**
 ```python
@@ -688,10 +679,10 @@ Session initialized with config: streaming_mode=<StreamingMode.BIDI: 'bidi'>
 
 | パラメータ | 目的 |
 |-----------|------|
-| `streaming_mode` | ADKとGemini間の通信：Live APIモデル用の`BIDI`（リアルタイム）、標準モデル用の`SSE`（レガシー）。注：クライアント-サーバー間のトランスポートは、この設定とは関係なく開発者が選択できます。 |
-| `response_modalities` | 音声応答には`["AUDIO"]`（Native audioモデルに必須）、テキストのみには`["TEXT"]` |
-| `input_audio_transcription` | ユーザー音声の書き起こし |
-| `output_audio_transcription` | モデル音声の書き起こし |
+| `streaming_mode` | ADKとGeminiモデル間の通信方法：Live APIモデル用の`BIDI`（リアルタイム）、または標準モデル用の`SSE`（レガシー）を選択。注：クライアント-サーバー間のトランスポートは、この設定とは関係なく開発者が選択できます。 |
+| `response_modalities` | モデルの応答のモダリティ設定。音声応答には`["AUDIO"]`（Native audioモデルに必須）、テキストのみには`["TEXT"]` |
+| `input_audio_transcription` | ユーザー音声の書き起こし設定 |
+| `output_audio_transcription` | モデル音声の書き起こし設定 |
 
 **追加のRunConfigオプション:**
 
@@ -732,7 +723,7 @@ live_request_queue = LiveRequestQueue()
 
 **`close()`が重要な理由:** Live APIセッションを適切に終了し、リソースを解放するために、常に`finally`ブロックで`close()`を呼び出してください。クローズを忘れると、残ったセッションがクオータ制限を圧迫する可能性があります。
 
-**step4_main.py:103-108** - 常にfinallyでクローズ：
+**step4_main.py:101-108** - 常にfinallyでクローズ：
 ```python
 except WebSocketDisconnect:
     print("Client disconnected")
@@ -759,19 +750,18 @@ else:
     print(f"Resumed existing session: {session_id}")
 ```
 
-このパターンは、セッションがすでに存在するか（リピーター）、新規作成が必要か（初回ユーザー）をチェックします。`session_id`はクライアントから来るため、再接続時の会話の継続性を可能にします。
+このコード例では、セッションがすでに存在するか新規作成が必要かをチェックしています。クライアントが指定したsession_idに該当するセッションが以前に作成済みの場合は、保存されたセッションから会話履歴が復元され、その文脈で会話を続けることができます。
 
 **ADK SessionとLive APIセッション:**
 
-多くの開発者が混乱する概念の一つ：ADK SessionとLive APIセッション。
+多くの開発者が混乱する点のひとつが、ADK SessionとLive APIセッションの違いです。
 
-| セッションタイプ | 寿命 | 保存場所 | 目的 |
+| セッションタイプ | 寿命 | 保存場所 | 利用目的 |
 |-----------------|------|----------|------|
-| **ADK Session** | 永続的（数日〜数ヶ月） | SessionService（メモリ、データベース、Vertex AI） | クライアントとの接続をまたいで会話履歴を保存 |
-| **Live APIセッション** | 一時的（`run_live()`中） | Live APIバックエンド | Geminiへのアクティブなストリーミング接続 |
+| **ADK Session** | 永続的（数日〜数ヶ月） | SessionService（メモリ、データベース、Vertex AI） | クライアントとの接続が終了しても以前の会話履歴を保持 |
+| **Live APIセッション** | 一時的（`run_live()`中） | Live APIバックエンド | Live APIモデルとの現在の会話内容の一時的な保持 |
 
-`run_live()`が開始すると（後述）、ADK Sessionから会話履歴をロードし、一時的なLive APIセッションを作成します。イベントが到着すると、ADKはそれらをADK Sessionに保存します。`run_live()`が終了すると、Live APIセッションは破棄されますが、会話履歴は次回のためにADK Sessionに保存されます。
-
+`run_live()`（後述）がのイベントループが開始すると、ADK Sessionから会話履歴がロードされ、それを元にLive APIセッションが作成されます。セッション中にLive APIから届いたイベントはすべてADK Sessionに保存されます。`run_live()`が終了すると、Live APIセッションは破棄されますが、会話履歴はADK Sessionに保存されます。
 
 ```mermaid
 sequenceDiagram
@@ -828,7 +818,7 @@ User said: Hello
 Sent to LiveRequestQueue
 ```
 
-メッセージはモデルに送られますが、応答はまだ受信できていません（次のステップで受信可能になります）。
+この時点でメッセージはモデルに送られていますが、応答はまだ受信できていません（次のステップで受信可能になります）。
 
 エディタで`main.py`を開いて新しいコードを確認します。主な追加：
 
@@ -842,28 +832,27 @@ Sent to LiveRequestQueue
 
 アップストリームタスクは**クライアント → モデル**方向のメッセージを処理します。WebSocketが接続中の間は無限ループとしてメッセージの到着を待機し、届いたメッセージを`LiveRequestQueue`経由でモデルに転送します：
 
-**step5_main.py:66-93**
+**step5_main.py:66-90**
 ```python
 async def upstream_task() -> None:
-    try:
-        while True:
-            message = await websocket.receive()  # クライアントからのWebSocketメッセージを待機
+    while True:
+        message = await websocket.receive()  # クライアントからのWebSocketメッセージを待機
 
-            if "text" in message:
-                text_data = message["text"]
-                json_message = json.loads(text_data)  # JSONをパース
+        if "text" in message:
+            text_data = message["text"]
+            json_message = json.loads(text_data)  # JSONをパース
 
-                if json_message.get("type") == "text":
-                    user_text = json_message["text"]
+            if json_message.get("type") == "text":
+                user_text = json_message["text"]
 
-                    # Contentオブジェクトを作成してキューに送信
-                    content = types.Content(
-                        parts=[types.Part(text=user_text)]
-                    )
-                    live_request_queue.send_content(content)
-    except WebSocketDisconnect:
-        print("Client disconnected")
+                # Contentオブジェクトを作成してキューに送信
+                content = types.Content(
+                    parts=[types.Part(text=user_text)]
+                )
+                live_request_queue.send_content(content)
 ```
+
+クライアントが切断すると、`websocket.receive()`は`WebSocketDisconnect`を発生させます。この例外は`asyncio.gather()`まで伝播し、両タスクがキャンセルされ、クリーンアップが行われる`finally`ブロックに到達します。
 
 **クライアントからFastAPIへ:**
 ユーザーがUIでテキストメッセージを入力すると、クライアントはメッセージの種類を識別する`type`フィールド付きのJSONとして送信します：
@@ -885,29 +874,35 @@ FastAPIはWebSocketフレームを受信し、フレームタイプに応じて`
 ```
 
 **アップストリームタスクからLiveRequestQueueへ:**
-アップストリームタスクはJSONをパースし、ユーザーのテキストを抽出し、`types.Content`オブジェクトでラップし、`live_request_queue.send_content()`経由でモデルに送信します。これはユーザーが入力を終えて応答を期待していることをモデルに知らせます。
+アップストリームタスクはJSONをパースし、ユーザーのテキストを抽出し、`types.Content`オブジェクトでラップし、`live_request_queue.send_content()`経由でモデルに送信します。これはユーザーが入力を終えて応答を待っていることをモデルに知らせます。
 
-**なぜ`types.Content`なのか？** ADKはすべてのデータ構造にGemini APIの`genai.types`を使用します。`Content`は1つ以上の`Part`オブジェクト（テキスト、画像など）を持つ完全なメッセージを表します。これはGemini API全体で使用されるのと同じ形式です。Bidi-streamingでは、通常単一のテキスト`Part`を使用します—画像と音声は`Blob`オブジェクトとして`send_realtime()`経由で別々に送信されます。
+**なぜ`types.Content`なのか？** ADKはコンテンツを扱うデータ構造としてGemini APIの`genai.types`パッケージ内の`Content`を使用します。`Content`は1つ以上の`Part`オブジェクト（テキスト、画像など）を持つメッセージ全体を表します。これはGemini APIで使用されるのと同じ形式です。Bidi-streamingでテキストをモデルに送信する場合、テキストを入れた単一の`Part`を`Content`に入れ、`send_content()`経由でモデルに送信します。一方、画像と音声の送信には`Content`は使わず、Blobオブジェクトとして`send_realtime()`経由で送信します。
 
 **ContentとBlob - いつ使うか:**
 
 | メソッド | データタイプ | 動作 |
 |----------|-------------|------|
-| `send_content()` | `types.Content` | 構造化テキスト - 「ユーザーが話し終えた」を示し、即座にモデルの応答をトリガー |
-| `send_realtime()` | `types.Blob` | バイナリストリーム（音声/画像） - 連続フロー、モデルはVADを使用していつ応答するか検出 |
+| `send_content()` | `types.Content` | ひとまとまりのテキストをモデルに送信。ユーザーがテキストを入力し終えたことを表すため、モデルは即座に応答します |
+| `send_realtime()` | `types.Blob` | 連続するバイナリストリーム（音声/画像）の一つのチャンク（かたまり）をモデルに送信。モデルは即座に応答せず、VAD（後述）で音声の区切りを検出してから応答します |
 
 **`asyncio.gather()`による並行実行:**
 
-**step5_main.py:104**
+**step5_main.py:99-106**
 ```python
-await asyncio.gather(upstream_task(), downstream_task())
+try:
+    await asyncio.gather(upstream_task(), downstream_task())
+except WebSocketDisconnect:
+    print("Client disconnected")
+finally:
+    live_request_queue.close()
+    print("Session terminated")
 ```
 
-これは両方のタスクを並行して実行します（`downstream_task()`は次のステップで実装）：
+この行では以下のタスクを並行で実行します（`downstream_task()`は次のステップで実装）：
 - **upstream_task**: WebSocketから受信 → モデルに送信
 - **downstream_task**: モデルから受信 → WebSocketに送信
 
-どちらかのタスクが例外を発生させると、両方がキャンセルされます—クライアントが切断したときのクリーンなシャットダウンを保証します。
+クライアントが切断すると、`WebSocketDisconnect`が`upstream_task`から伝播し、両タスクがキャンセルされます。`finally`ブロックにより、常にクリーンアップが実行されます。
 
 ### クライアントコードを理解する: テキストメッセージの送信
 
@@ -979,7 +974,7 @@ python -m uvicorn main:app --host 0.0.0.0 --port 8080
 
 ### サーバーコードを理解する: run_live()
 
-**step6_main.py:81-96**
+**step6_main.py:78-93**
 ```python
 async def downstream_task() -> None:
     async for event in runner.run_live(
@@ -1130,7 +1125,7 @@ python -m uvicorn main:app --host 0.0.0.0 --port 8080
 - **types.Blob**: `audio/pcm;rate=16000` MIMEタイプで音声blobを作成
 - **send_realtime()**: 音声を継続的にストリーム（VADが応答をトリガー）
 
-**step7_main.py:86-98** - バイナリメッセージ処理：
+**step7_main.py:85-97** - バイナリメッセージ処理：
 ```python
 # バイナリメッセージ（音声）を処理
 elif "bytes" in message:
@@ -1460,7 +1455,7 @@ python -m uvicorn main:app --host 0.0.0.0 --port 8080
 
 ### サーバーコードを理解する: 画像入力の処理
 
-**画像メッセージの処理 (step8_main.py:88-103):**
+**画像メッセージの処理 (step8_main.py:87-102):**
 
 アップストリームタスクはJSONの`type: "image"`をチェックして画像メッセージを検出します。base64画像データをデコードし、`send_realtime()`経由でモデルに送信します—音声と同じメソッドです。
 
