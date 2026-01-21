@@ -498,8 +498,6 @@ from google.adk.tools import google_search
 2. ADK automatically executes the search and returns results to the model
 3. The model synthesizes the results into a natural response
 
-You'll see tool calls in the Event Console as 🛠️ (tool call) and ✅ (tool response) events. ADK handles tool execution automatically—you don't need to write any tool-handling code.
-
 > **Note**: The agent isn't integrated with ADK yet, so you can't test tool calls at this step. You'll try it in Step 6 when bidirectional streaming is complete—ask "Search for the weather in Tokyo" and watch the tool execution flow in the Event Console.
 
 ### Choosing a Live API model
@@ -571,13 +569,12 @@ Open the demo page on the browser, make sure the app is Connected, and send a "H
 
 Open `main.py` in the editor to examine the new code. Key additions:
 
-- **Load environment**: `load_dotenv()` loads `.env` before importing agent
-- **SessionService**: `InMemorySessionService()` stores conversation history
+- **Load environment**: `load_dotenv()` loads `.env`
+- **SessionService**: `InMemorySessionService()` stores conversation history to memory
 - **Runner**: Orchestrates agent execution with session management
 
 **step3_main.py:13-14** - Load environment variables for calling Live API:
 ```python
-# Load environment variables BEFORE importing agent
 load_dotenv(Path(__file__).parent / ".env")
 ```
 
@@ -601,7 +598,7 @@ runner = Runner(
 
 ### Understanding the Client Code: Session ID Generation
 
-While `SessionService` and `Runner` are server-side, the client controls session identity.
+In this sample code, it generates the user ID and session ID at the client side:
 
 **Session ID generation (app.js:10-12):**
 
@@ -1124,7 +1121,6 @@ Open `main.py` in the editor to examine the new code. Key additions:
 - **Binary message handling**: Detects `"bytes"` in WebSocket message
 - **types.Blob**: Creates audio blob with `audio/pcm;rate=16000` MIME type
 - **send_realtime()**: Streams audio continuously (VAD triggers response)
-- **Warning filters**: Suppresses noisy authentication warnings
 
 **step7_main.py:86-97** - Binary message handling:
 ```python
@@ -1608,7 +1604,7 @@ Phase 4: Termination       →  close() the queue (always in finally)
 
 ### Key Code Patterns
 
-These are the essential patterns you'll use in every ADK streaming application. Keep this as a quick reference.
+These are the essential patterns you'll use in every ADK streaming application.
 
 ```python
 # Upstream: Send text
