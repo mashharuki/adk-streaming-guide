@@ -636,13 +636,6 @@ Stop the server with **Ctrl+C**, then copy the step 4 source file to `main.py`:
 cp step4_main.py main.py
 ```
 
-Open `main.py` in the editor to examine the new code. Key additions:
-
-- **RunConfig**: Configures streaming mode, response modalities, and transcription
-- **Session management**: Gets or creates session for conversation history
-- **LiveRequestQueue**: Creates the queue for sending input to the model
-- **Termination**: Closes the queue in `finally` block
-
 ### Test Step 4
 
 Restart the server:
@@ -651,9 +644,30 @@ Restart the server:
 python -m uvicorn main:app --host 0.0.0.0 --port 8080
 ```
 
-Open a second browser tab with the same URL to verify multiple sessions work.
+Open a second browser tab with the same URL. Examine the server log to see each tab creates a new session with a unique ID:
+
+```
+INFO:     127.0.0.1:39884 - "WebSocket /ws/demo-user/demo-session-cy0x8f" [accepted]
+Client connected: user=demo-user, session=demo-session-cy0x8f
+Created new session: demo-session-cy0x8f
+...
+INFO:     127.0.0.1:38498 - "WebSocket /ws/demo-user/demo-session-xoamfa" [accepted]
+Client connected: user=demo-user, session=demo-session-xoamfa
+Created new session: demo-session-xoamfa
+```
+
+Each browser tab generates a unique `session_id`, allowing multiple concurrent conversations.
+
+Open `main.py` in the editor to examine the new code. Key additions:
+
+- **RunConfig**: Configures streaming mode, response modalities, and transcription
+- **Session management**: Gets or creates session for conversation history
+- **LiveRequestQueue**: Creates the queue for sending input to the model
+- **Termination**: Closes the queue in `finally` block
 
 ### Understanding the Server Code: RunConfig
+
+`RunConfig` controls how the streaming session behaves—what modalities to use, whether to transcribe audio, and other runtime settings.
 
 **step4_main.py:56-61**
 ```python
@@ -665,41 +679,45 @@ run_config = RunConfig(
 )
 ```
 
+You can see the RunConfig settings in the server log when a session is initialized:
+
+```
+Session initialized with config: streaming_mode=<StreamingMode.BIDI: 'bidi'>
+  response_modalities=['AUDIO'] input_audio_transcription=AudioTranscriptionConfig()
+  output_audio_transcription=AudioTranscriptionConfig() ...
+```
+
 **Key RunConfig options:**
 
 | Parameter | Purpose |
 |-----------|---------|
-| `streaming_mode` | `BIDI` for WebSocket, `SSE` for HTTP |
-| `response_modalities` | `["AUDIO"]` for native audio models |
-| `input_audio_transcription` | Transcribe user speech to text |
-| `output_audio_transcription` | Transcribe model audio to text |
+| `streaming_mode` | Communication between ADK and Gemini: `BIDI` for Live API models (real-time), `SSE` for standard models (legacy). Note: your client-server transport is independent and can be different |
+| `response_modalities` | `["AUDIO"]` for voice responses (required for native audio models), `["TEXT"]` for text-only |
+| `input_audio_transcription` | Transcribe user's speech to text—displays what the user said in the chat |
+| `output_audio_transcription` | Transcribe model's audio to text—useful for logging and accessibility |
 
-![RunConfig Configuration Options](assets/runconfig.png)
-
-**Additional RunConfig options for production:**
+**Additional RunConfig options:**
 
 | Parameter | Purpose |
 |-----------|---------|
 | `speech_config` | Configure voice selection and speaking style |
 | `proactivity` | Enable model-initiated responses (native audio only) |
-| `session_resumption` | Enable automatic reconnection after WebSocket timeouts |
-| `context_window_compression` | Remove session duration limits |
+| `enable_affective_dialog` | Emotional adaptation in responses (native audio only) |
+| `session_resumption` | Enable automatic reconnection after Live API connection timeouts (~10 min) |
+| `context_window_compression` | Enable unlimited session duration by summarizing old context |
+| `realtime_input_config` | Configure Voice Activity Detection (VAD) behavior |
+| `save_live_blob` | Persist audio/video streams for debugging and compliance |
 
-**Understanding Session Types:**
-
-One concept trips up many developers: ADK Session vs Live API session.
-
-- **ADK Session**: Persistent, lives in SessionService, survives restarts. User returns days later with history intact.
-- **Live API session**: Ephemeral, exists only during active `run_live()`. When the loop ends, it's destroyed—but ADK has already persisted the events.
+![RunConfig Configuration Options](assets/runconfig.png)
 
 ### Understanding the Server Code: LiveRequestQueue
+
+The `LiveRequestQueue` is your primary interface for sending input to the model. Think of it as a mailbox where you drop messages, and ADK delivers them to the Live API.
 
 **step4_main.py:76**
 ```python
 live_request_queue = LiveRequestQueue()
 ```
-
-The `LiveRequestQueue` is your primary interface for sending input to the model:
 
 ![LiveRequestQueue Methods](assets/live_req_queue.png)
 
@@ -710,6 +728,80 @@ The `LiveRequestQueue` is your primary interface for sending input to the model:
 | `send_activity_start()` | Signal user is active | No |
 | `send_activity_end()` | Signal user stopped | May trigger response |
 | `close()` | End the session | N/A |
+
+**Key difference between `send_content()` and `send_realtime()`:**
+
+- **`send_content()`**: For complete text messages. The model starts responding immediately after receiving the content. Use this for chat-style text input.
+
+- **`send_realtime()`**: For continuous streams like audio and video. The model accumulates chunks and uses Voice Activity Detection (VAD) to determine when the user has finished speaking before responding. Use this for microphone audio and camera frames.
+
+**Why `close()` matters:** Always call `close()` in a `finally` block to properly terminate the Live API session and release resources. Forgetting to close can leave orphaned sessions counting against your quota.
+
+**step4_main.py:103-108** - Always close in `finally`:
+```python
+except WebSocketDisconnect:
+    print("Client disconnected")
+finally:
+    # Phase 4: Termination - always close the queue
+    live_request_queue.close()
+    print("LiveRequestQueue closed")
+```
+
+### Understanding Session Management
+
+**step4_main.py:64-73** - Get or create ADK Session:
+```python
+# Get or create session for conversation history
+session = await session_service.get_session(
+    app_name=APP_NAME, user_id=user_id, session_id=session_id
+)
+if not session:
+    await session_service.create_session(
+        app_name=APP_NAME, user_id=user_id, session_id=session_id
+    )
+    print(f"Created new session: {session_id}")
+else:
+    print(f"Resumed existing session: {session_id}")
+```
+
+This pattern checks if a session already exists (returning user) or creates a new one (first-time user). The `session_id` comes from the client, enabling conversation continuity across reconnections.
+
+**ADK Session vs Live API session:**
+
+One concept trips up many developers: ADK Session vs Live API session.
+
+| Session Type | Lifetime | Storage | Purpose |
+|--------------|----------|---------|---------|
+| **ADK Session** | Persistent (days/months) | SessionService (memory, database, Vertex AI) | Store conversation history across reconnections |
+| **Live API session** | Ephemeral (during `run_live()`) | Live API backend | Active streaming connection to Gemini |
+
+When `run_live()` starts (we will see it later), it loads history from the ADK Session and creates an ephemeral Live API session. As events arrive, ADK saves them to the ADK Session. When `run_live()` ends, the Live API session is destroyed—but the conversation history remains in the ADK Session for next time.
+
+
+```mermaid
+sequenceDiagram
+    participant App as Your Application
+    participant SS as SessionService
+    participant ADK as ADK (run_live)
+    participant Live as Live API Session
+
+    App->>SS: get_session(user_id, session_id)
+    SS-->>App: Session with history
+
+    App->>ADK: runner.run_live(...)
+    ADK->>Live: Initialize with history
+    activate Live
+
+    Note over ADK,Live: Bidirectional streaming...
+
+    ADK->>SS: Save new events
+
+    App->>ADK: queue.close()
+    ADK->>Live: Terminate
+    deactivate Live
+    Note over Live: Live API session destroyed
+    Note over SS: ADK Session persists with history
+```
 
 ### Step 4 Checkpoint
 
