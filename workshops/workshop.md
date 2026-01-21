@@ -450,6 +450,8 @@ This workshop uses WebSocket for bidirectional audio streaming, but you can also
 ### Step 1 Checkpoint
 
 > **What you built**: You set up a FastAPI app with a WebSocket endpoint that receives messages and sends responses. The frontend displays it as a chat message because the response follows ADK's event format.
+>
+> **Learn more**: [ADK Bidi-streaming Architecture](https://google.github.io/adk-docs/streaming/dev-guide/part1/)
 
 ---
 
@@ -534,6 +536,8 @@ The `model` parameter determines which Live API model powers your agent. Two fun
 ### Step 2 Checkpoint
 
 > **What you built**: You defined an AI agent with a system prompt, model selection, and tools. The agent is stateless and will serve all users. However, it's not yet connected to the WebSocket—that comes next.
+>
+> **Learn more**: [ADK Agents](https://google.github.io/adk-docs/agents/)
 
 ---
 
@@ -622,6 +626,8 @@ const ws_url = "ws://" + window.location.host + "/ws/" + userId + "/" + sessionI
 ### Step 3 Checkpoint
 
 > **What you built**: You initialized the three core ADK components—Agent, SessionService, and Runner. These are created once at startup and shared across all connections. The app isn't ready for actual chat yet—we'll connect to the Live API in the next steps.
+>
+> **Learn more**: [Application Lifecycle](https://google.github.io/adk-docs/streaming/dev-guide/part1/#the-4-phase-application-lifecycle)
 
 ---
 
@@ -805,6 +811,8 @@ sequenceDiagram
 ### Step 4 Checkpoint
 
 > **What you built**: You implemented Phase 2 of the lifecycle—session initialization. Each WebSocket connection now gets its own RunConfig, Session, and LiveRequestQueue. The `finally` block ensures proper cleanup when connections close.
+>
+> **Learn more**: [RunConfig Options](https://google.github.io/adk-docs/streaming/dev-guide/part4/#understanding-runconfig)
 
 ---
 
@@ -941,6 +949,8 @@ function sendMessage(message) {
 ### Step 5 Checkpoint
 
 > **What you built**: You implemented the upstream task that receives WebSocket messages and sends them to the model via `LiveRequestQueue.send_content()`. Messages are flowing to the Live API, but we're not receiving responses yet—that's next!
+>
+> **Learn more**: [Upstream Message Processing](https://google.github.io/adk-docs/streaming/dev-guide/part2/)
 
 ---
 
@@ -1100,6 +1110,8 @@ Each event appends text to the same bubble, creating the "typing" effect.
 ### Step 6 Checkpoint
 
 > **What you built**: You completed the bidirectional streaming loop! The downstream task uses `runner.run_live()` to receive events from the model and forward them to the client. You now have full text-based conversation with streaming responses, tool execution (Google Search), and interruption handling.
+>
+> **Learn more**: [Downstream Event Handling](https://google.github.io/adk-docs/streaming/dev-guide/part3/)
 
 ---
 
@@ -1437,6 +1449,8 @@ if (adkEvent.content && adkEvent.content.parts) {
 ### Step 7 Checkpoint
 
 > **What you built**: You added bidirectional audio streaming! The upstream task now handles binary WebSocket frames containing PCM audio, sending them via `send_realtime()`. The model responds with audio that plays through the browser's AudioWorklet.
+>
+> **Learn more**: [Multimodal Streaming](https://google.github.io/adk-docs/streaming/dev-guide/part5/)
 
 ---
 
@@ -1587,6 +1601,8 @@ Camera → MediaStream → <video> element (preview)
 ### Step 8 Checkpoint
 
 > **What you built**: You completed the full multimodal application! The server now handles text, audio, and image input through the same `LiveRequestQueue` interface. The model can see, hear, and respond with natural speech.
+>
+> **Learn more**: [Multimodal Streaming](https://google.github.io/adk-docs/streaming/dev-guide/part5/)
 
 ---
 

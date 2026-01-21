@@ -441,6 +441,8 @@ connectWebsocket();
 ### ステップ1チェックポイント
 
 > **構築したもの**: メッセージを受信し応答を送信するWebSocketエンドポイントを持つFastAPIアプリをセットアップしました。応答がADKのイベント形式に従っているため、フロントエンドはチャットメッセージとして表示します。
+>
+> **より詳しい解説**: [ADK Bidi-streamingアーキテクチャ](https://google.github.io/adk-docs/streaming/dev-guide/part1/)
 
 ---
 
@@ -525,6 +527,8 @@ from google.adk.tools import google_search
 ### ステップ2チェックポイント
 
 > **構築したもの**: システムプロンプト、モデル選択、ツールを持つAIエージェントを定義しました。エージェントはステートレスで、すべてのユーザーに対応します。ただし、まだWebSocketに接続されていません—それは次のステップです。
+>
+> **より詳しい解説**: [ADK Agents](https://google.github.io/adk-docs/agents/)
 
 ---
 
@@ -613,6 +617,8 @@ const ws_url = "ws://" + window.location.host + "/ws/" + userId + "/" + sessionI
 ### ステップ3チェックポイント
 
 > **構築したもの**: 3つのコアADKコンポーネント—Agent、SessionService、Runnerを初期化しました。これらは起動時に一度作成され、すべての接続で共有されます。アプリはまだ実際のチャットの準備ができていません—次のステップでLive APIに接続します。
+>
+> **より詳しい解説**: [アプリケーションライフサイクル](https://google.github.io/adk-docs/streaming/dev-guide/part1/#the-4-phase-application-lifecycle)
 
 ---
 
@@ -791,6 +797,8 @@ sequenceDiagram
 ### ステップ4チェックポイント
 
 > **構築したもの**: ライフサイクルのフェーズ2—セッション初期化を実装しました。各WebSocket接続は独自のRunConfig、Session、LiveRequestQueueを持つようになりました。`finally`ブロックで接続クローズ時の適切なクリーンアップを保証します。
+>
+> **より詳しい解説**: [RunConfigオプション](https://google.github.io/adk-docs/streaming/dev-guide/part4/#understanding-runconfig)
 
 ---
 
@@ -927,6 +935,8 @@ function sendMessage(message) {
 ### ステップ5チェックポイント
 
 > **構築したもの**: WebSocketメッセージを受信し、`LiveRequestQueue.send_content()`経由でモデルに送信するアップストリームタスクを実装しました。メッセージはLive APIに流れていますが、応答はまだ受信できていません—それは次のステップです！
+>
+> **より詳しい解説**: [アップストリームメッセージ処理](https://google.github.io/adk-docs/streaming/dev-guide/part2/)
 
 ---
 
@@ -1086,6 +1096,8 @@ websocket.onmessage = function(event) {
 ### ステップ6チェックポイント
 
 > **構築したもの**: 双方向ストリーミングループを完成させました！ダウンストリームタスクは`runner.run_live()`を使用してモデルからイベントを受信し、クライアントに転送します。ストリーミング応答、ツール実行（Google Search）、割り込み処理を備えた完全なテキストベースの会話ができるようになりました。
+>
+> **より詳しい解説**: [ダウンストリームイベント処理](https://google.github.io/adk-docs/streaming/dev-guide/part3/)
 
 ---
 
@@ -1421,6 +1433,8 @@ if (adkEvent.content && adkEvent.content.parts) {
 ### ステップ7チェックポイント
 
 > **構築したもの**: 双方向音声ストリーミングを追加しました！アップストリームタスクはPCM音声を含むバイナリWebSocketフレームを処理し、`send_realtime()`経由で送信するようになりました。モデルはブラウザのAudioWorkletを通じて再生される音声で応答します。
+>
+> **より詳しい解説**: [マルチモーダルストリーミング](https://google.github.io/adk-docs/streaming/dev-guide/part5/)
 
 ---
 
@@ -1571,6 +1585,8 @@ function sendImage(base64Image) {
 ### ステップ8チェックポイント
 
 > **構築したもの**: 完全なマルチモーダルアプリケーションを完成させました！サーバーは同じ`LiveRequestQueue`インターフェースを通じてテキスト、音声、画像入力を処理するようになりました。モデルは見て、聞いて、自然な音声で応答できます。
+>
+> **より詳しい解説**: [マルチモーダルストリーミング](https://google.github.io/adk-docs/streaming/dev-guide/part5/)
 
 ---
 
