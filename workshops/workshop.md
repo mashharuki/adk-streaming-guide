@@ -391,11 +391,9 @@ The frontend establishes and manages the WebSocket connection. Here's what happe
 **Connecting to the server (app.js:10-12, 317-350):**
 
 ```javascript
-// app.js:10-12 - Session identifiers
 const userId = "demo-user";
 const sessionId = "demo-session-" + Math.random().toString(36).substring(7);
 
-// app.js:317-350 - WebSocket connection
 function connectWebsocket() {
     // Construct WebSocket URL with user/session IDs
     const ws_url = "ws://" + window.location.host + "/ws/" + userId + "/" + sessionId;
@@ -603,10 +601,11 @@ runner = Runner(
 
 ### Understanding the Client Code: Session ID Generation
 
-While `SessionService` and `Runner` are server-side, the client controls session identity:
+While `SessionService` and `Runner` are server-side, the client controls session identity.
+
+**Session ID generation (app.js:10-12):**
 
 ```javascript
-// app.js - Session ID generation
 const userId = "demo-user";  // In production: authenticated user ID
 const sessionId = "demo-session-" + Math.random().toString(36).substring(7);
 
@@ -911,10 +910,11 @@ Now that we've seen how the server handles incoming messages, let's look at the 
 
 **Why JSON with a type field?** The client sends text and images as JSON with a `type` field, allowing the server to route each message to the appropriate handler. This pattern is extensible—you could add other message types like control commands (e.g., `{"type": "clear_history"}`) without changing the protocol. Audio is different—it's sent as raw binary WebSocket frames for efficiency (we'll see this in Step 7).
 
-The client sends text as JSON through the WebSocket:
+**Sending text messages (app.js:755-766):**
+
+The client sends text as JSON through the WebSocket. It checks that the connection is open before sending.
 
 ```javascript
-// app.js:755-766 - Send text message
 function sendMessage(message) {
     if (websocket && websocket.readyState === WebSocket.OPEN) {
         const jsonMessage = JSON.stringify({
@@ -925,8 +925,6 @@ function sendMessage(message) {
     }
 }
 ```
-
-The `sendMessage()` function packages text into JSON and sends it via WebSocket. It checks that the connection is open before sending.
 
 ### Step 5 Checkpoint
 
@@ -1018,10 +1016,11 @@ The `async for` loop processes events one at a time:
 
 ### Understanding the Client Code: Receiving and Processing Events
 
-The client handles all incoming ADK events in `websocket.onmessage`:
+**Event handler (app.js:341-693, simplified):**
+
+The client handles all incoming ADK events in `websocket.onmessage`. This single handler processes text, audio, transcriptions, tool calls, and control signals.
 
 ```javascript
-// app.js:341-693 - Event handler (simplified)
 websocket.onmessage = function(event) {
     const adkEvent = JSON.parse(event.data);
 
@@ -1114,9 +1113,11 @@ Test voice interaction:
 
 1. Click "Start Audio" button
 2. Allow microphone access
-3. Speak "Hello, can you hear me?"
+3. Speak "What's the current stock price of Alphabet"
 4. Wait for the response—you should hear the AI speak back!
 5. You should see your speech transcribed in the chat and hear the AI's audio response
+
+### Understanding Audio handling
 
 Open `main.py` in the editor to examine the new code. Key additions:
 
@@ -1125,13 +1126,21 @@ Open `main.py` in the editor to examine the new code. Key additions:
 - **send_realtime()**: Streams audio continuously (VAD triggers response)
 - **Warning filters**: Suppresses noisy authentication warnings
 
-### Multimodal Capabilities
+**step7_main.py:86-97** - Binary message handling:
+```python
+# Handle binary messages (audio)
+elif "bytes" in message:
+    audio_data = message["bytes"]
 
-ADK Bidi-streaming supports audio, images, and video through the same streaming interface.
+    # Create audio blob with correct format
+    audio_blob = types.Blob(
+        mime_type="audio/pcm;rate=16000",  # 16kHz mono PCM
+        data=audio_data
+    )
 
-![Comprehensive Summary of ADK Live API Multimodal Capabilities](assets/multimodal.png)
-
-### Understand Audio Format
+    # Stream audio (doesn't trigger response until VAD detects silence)
+    live_request_queue.send_realtime(audio_blob)
+```
 
 The Live API has specific requirements for audio input and output:
 
@@ -1154,28 +1163,99 @@ The Live API has specific requirements for audio input and output:
 | Channels | Mono |
 | Delivery | Streamed as `inline_data` in events |
 
-The frontend's AudioWorklet handles format conversion automatically. The browser captures at 16kHz for input, and the player expects 24kHz for output.
+![Comprehensive Summary of ADK Live API Multimodal Capabilities](assets/multimodal.png)
 
-### send_content() vs send_realtime()
 
+#### Voice Activity Detection (VAD)
+
+**[VAD (Voice Activity Detection)](https://ai.google.dev/gemini-api/docs/live-guide#voice-activity-detection-vad)** is enabled by default on all Live API models. It automatically detects when you start and stop speaking, enabling natural turn-taking without manual control.
+
+**How VAD works:**
+
+1. **Detects speech start**: Identifies when a user begins speaking
+2. **Detects speech end**: Recognizes natural pauses indicating the user finished
+3. **Triggers response**: Model starts responding after detecting end of speech
+4. **Handles interruptions**: Enables natural back-and-forth conversation flow
+
+This is why `send_realtime()` doesn't immediately trigger a response—the model waits for VAD to detect silence before responding.
+
+**When to disable VAD:**
+
+- Push-to-talk implementations where your app controls turn-taking
+- Client-side VAD to reduce bandwidth (only send audio during speech)
+- Specific UX patterns requiring manual "done speaking" signals
+
+When VAD is disabled, you must use `send_activity_start()` and `send_activity_end()` to manually signal turn boundaries.
+
+#### Audio Transcription
+
+The Live API provides built-in audio transcription that automatically converts speech to text for both user input and model output. This enables real-time captions, conversation logging, and accessibility features without external transcription services.
+
+**step7_main.py:53-54** - Enable transcription in RunConfig:
 ```python
-# Text: triggers immediate model response
-live_request_queue.send_content(content)
-
-# Audio: streams continuously, model uses VAD to detect turn end
-live_request_queue.send_realtime(audio_blob)
+run_config = RunConfig(
+    streaming_mode=StreamingMode.BIDI,
+    response_modalities=["AUDIO"],
+    input_audio_transcription=types.AudioTranscriptionConfig(),   # User speech → text
+    output_audio_transcription=types.AudioTranscriptionConfig(),  # Model speech → text
+)
 ```
 
-**[VAD (Voice Activity Detection)](https://ai.google.dev/gemini-api/docs/live-guide#voice-activity-detection-vad)**: The Live API automatically detects when you stop speaking and triggers a response—no manual "end of turn" signal needed.
+**Transcription is enabled by default** when using audio modality. To disable, explicitly set to `None`:
 
-### Understanding the Client Code: Audio Capture with AudioWorklet
+```python
+input_audio_transcription=None,   # Disable user transcription
+output_audio_transcription=None,  # Disable model transcription
+```
 
-The frontend captures microphone audio using the [Web Audio API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Audio_API) with AudioWorklet for low-latency processing:
+**Handling transcriptions on the client (app.js:533-655, excerpt):**
+
+Transcriptions arrive as separate fields on ADK events—not as content parts. The `finished` flag indicates whether the transcription is partial (still in progress) or complete.
+
+```javascript
+if (adkEvent.inputTranscription && adkEvent.inputTranscription.text) {
+    // User's speech transcribed to text
+    const userText = adkEvent.inputTranscription.text;
+    const isComplete = adkEvent.inputTranscription.finished;
+    displayCaption(userText, "user", isComplete);
+}
+
+if (adkEvent.outputTranscription && adkEvent.outputTranscription.text) {
+    // Model's speech transcribed to text
+    const modelText = adkEvent.outputTranscription.text;
+    const isComplete = adkEvent.outputTranscription.finished;
+    displayCaption(modelText, "model", isComplete);
+}
+```
+
+### Understanding the Client Code: Audio Capture
+
+The client captures microphone audio using the [Web Audio API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Audio_API) with AudioWorklet for low-latency processing. AudioWorklet runs on a dedicated audio thread, ensuring glitch-free capture without being blocked by UI updates or network activity.
+
+**The AudioWorklet processor (pcm-recorder-processor.js:1-18):**
+
+This processor runs on the audio thread and captures raw audio frames. The `process()` method is called automatically ~125 times per second (128 samples per call at 16kHz), copying each frame and sending it to the main thread via `postMessage()`.
+
+```javascript
+class PCMProcessor extends AudioWorkletProcessor {
+    process(inputs, outputs, parameters) {
+        if (inputs.length > 0 && inputs[0].length > 0) {
+            const inputChannel = inputs[0][0];
+            const inputCopy = new Float32Array(inputChannel);
+            this.port.postMessage(inputCopy);  // Send to main thread
+        }
+        return true;  // Keep processor alive
+    }
+}
+
+registerProcessor("pcm-recorder-processor", PCMProcessor);
+```
 
 **Setting up the audio pipeline (audio-recorder.js:7-38):**
 
+This function orchestrates the complete audio capture pipeline. It creates an AudioContext configured for 16kHz sampling (matching Live API requirements), loads the AudioWorklet processor, requests microphone access, and wires everything together. When audio data arrives from the worklet, it converts the Float32 samples to 16-bit PCM and passes them to your handler function for transmission over WebSocket.
+
 ```javascript
-// audio-recorder.js:7-38 - Start audio recording
 export async function startAudioRecorderWorklet(audioRecorderHandler) {
     // Create AudioContext at 16kHz (required by Live API)
     const audioRecorderContext = new AudioContext({ sampleRate: 16000 });
@@ -1206,7 +1286,6 @@ export async function startAudioRecorderWorklet(audioRecorderHandler) {
     return [audioRecorderNode, audioRecorderContext, micStream];
 }
 
-// audio-recorder.js:49-58 - Convert Float32 samples to 16-bit PCM
 function convertFloat32ToPCM(inputData) {
     const pcm16 = new Int16Array(inputData.length);
     for (let i = 0; i < inputData.length; i++) {
@@ -1216,28 +1295,11 @@ function convertFloat32ToPCM(inputData) {
 }
 ```
 
-**The AudioWorklet processor (pcm-recorder-processor.js:1-18):**
-
-```javascript
-// pcm-recorder-processor.js:1-18
-class PCMProcessor extends AudioWorkletProcessor {
-    process(inputs, outputs, parameters) {
-        if (inputs.length > 0 && inputs[0].length > 0) {
-            const inputChannel = inputs[0][0];
-            const inputCopy = new Float32Array(inputChannel);
-            this.port.postMessage(inputCopy);  // Send to main thread
-        }
-        return true;  // Keep processor alive
-    }
-}
-
-registerProcessor("pcm-recorder-processor", PCMProcessor);
-```
-
 **Sending audio chunks (app.js:979-988):**
 
+This handler is called for each audio chunk from the AudioWorklet. It checks that the WebSocket connection is open and audio mode is enabled before sending the PCM data as a binary frame. The WebSocket API automatically sends binary frames when you pass an `ArrayBuffer` (which `pcmData` is), versus text frames for strings. Binary frames are more efficient than base64-encoded JSON, reducing bandwidth by ~33% and eliminating encoding overhead.
+
 ```javascript
-// app.js:979-988
 function audioRecorderHandler(pcmData) {
     if (websocket && websocket.readyState === WebSocket.OPEN && is_audio) {
         websocket.send(pcmData);  // Send as binary WebSocket frame
@@ -1245,7 +1307,7 @@ function audioRecorderHandler(pcmData) {
 }
 ```
 
-**Audio pipeline flow:**
+**Audio capture pipeline summary:**
 
 ```
 Microphone → MediaStream → AudioContext (16kHz resample)
@@ -1254,8 +1316,6 @@ Microphone → MediaStream → AudioContext (16kHz resample)
     → WebSocket binary frame → Server → send_realtime()
 ```
 
-**Key concepts:**
-
 | Component | Purpose |
 |-----------|---------|
 | `AudioContext({ sampleRate: 16000 })` | Resample to Live API's required 16kHz |
@@ -1263,33 +1323,17 @@ Microphone → MediaStream → AudioContext (16kHz resample)
 | `Float32 → Int16` | Convert Web Audio format to PCM |
 | Binary WebSocket frame | More efficient than base64 encoding |
 
-### Understanding the Server Code: Audio Response Events
+This architecture ensures low-latency audio capture with consistent timing. The AudioWorklet runs on a dedicated thread, so UI updates or network activity won't cause audio glitches. 
 
-Since we configured `response_modalities=["AUDIO"]`, the model returns audio in events:
+### Understanding the Client Code: Audio Playback
 
-```python
-# Audio arrives as inline_data in content parts
-if event.content and event.content.parts:
-    for part in event.content.parts:
-        if part.inline_data:
-            # Base64-encoded 24kHz PCM audio
-            mime_type = part.inline_data.mime_type  # "audio/pcm;rate=24000"
-            audio_data = part.inline_data.data       # Base64 string
-```
-
-The frontend's audio player worklet handles:
-1. Base64 decoding
-2. Ring buffer for smooth playback
-3. 24kHz PCM to speaker output
-
-### Understanding the Client Code: Audio Playback with Ring Buffer
-
-The frontend plays audio using an AudioWorklet with a ring buffer for smooth, glitch-free playback:
+Now let's look at how audio flows in the opposite direction—from the model back to the user's speakers. The frontend plays audio using an AudioWorklet with a ring buffer for smooth, glitch-free playback:
 
 **Setting up the audio player (audio-player.js:5-24):**
 
+This function initializes the audio playback pipeline. It creates an AudioContext at 24kHz (matching Live API's output format—note this differs from the 16kHz input), loads the AudioWorklet processor, and connects it to the speakers (`audioContext.destination`). The returned `audioPlayerNode` is used to send audio data for playback.
+
 ```javascript
-// audio-player.js:5-24 - Start audio playback
 export async function startAudioPlayerWorklet() {
     // Create AudioContext at 24kHz (Live API output format)
     const audioContext = new AudioContext({ sampleRate: 24000 });
@@ -1308,8 +1352,9 @@ export async function startAudioPlayerWorklet() {
 
 **The ring buffer player (pcm-player-processor.js:5-75):**
 
+This processor uses a circular (ring) buffer to handle variable network latency. Audio chunks arrive from the WebSocket at irregular intervals, but playback must be perfectly continuous. The ring buffer absorbs timing variations: `_enqueue()` adds incoming samples at `writeIndex`, while `process()` reads samples at `readIndex` for output. If the buffer empties (underflow), it outputs silence; if it fills (overflow), oldest samples are overwritten. The `endOfAudio` command clears the buffer instantly when the user interrupts the model.
+
 ```javascript
-// pcm-player-processor.js:5-75
 class PCMPlayerProcessor extends AudioWorkletProcessor {
     constructor() {
         super();
@@ -1364,8 +1409,9 @@ registerProcessor('pcm-player-processor', PCMPlayerProcessor);
 
 **Receiving and playing audio (app.js:341-693, excerpt):**
 
+This code runs in the WebSocket message handler. When an ADK event arrives containing audio data (`inlineData` with `audio/pcm` MIME type), it decodes the base64-encoded audio to an `ArrayBuffer` and sends it to the AudioWorklet via `postMessage()`. The worklet then buffers and plays the audio continuously.
+
 ```javascript
-// app.js:341-693 - In websocket.onmessage handler (excerpt)
 if (adkEvent.content && adkEvent.content.parts) {
     for (const part of adkEvent.content.parts) {
         if (part.inlineData && part.inlineData.mimeType.startsWith("audio/pcm")) {
@@ -1375,35 +1421,7 @@ if (adkEvent.content && adkEvent.content.parts) {
         }
     }
 }
-
-function base64ToArrayBuffer(base64) {
-    const binaryString = atob(base64);
-    const bytes = new Uint8Array(binaryString.length);
-    for (let i = 0; i < binaryString.length; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
-    }
-    return bytes.buffer;
-}
 ```
-
-**Why a ring buffer?**
-
-```
-Without ring buffer:
-  Network jitter → Audio gaps → Choppy playback
-
-With ring buffer:
-  Network jitter → Buffer absorbs → Smooth playback
-
-Ring buffer visualization:
-     writeIndex (network writes here)
-         ↓
-[ ][█][█][█][█][ ][ ][ ]
-            ↑
-        readIndex (speaker reads here)
-```
-
-The buffer absorbs timing variations between network arrival and audio playback, ensuring smooth output even with irregular packet delivery.
 
 ### Step 7 Checkpoint
 
@@ -1436,12 +1454,33 @@ Test image input:
 3. Capture an image
 4. Ask "What do you see in this image?"
 
-Open `main.py` in the editor to examine the new code. Key additions:
+Open `main.py` in the editor to examine the new code.
 
-- **Image message handling**: Detects `{"type": "image", ...}` JSON messages
-- **Base64 decoding**: `base64.b64decode()` converts image data
-- **types.Blob for images**: Creates blob with `image/jpeg` MIME type
-- **send_realtime() for images**: Sends image same as audio
+### Understanding the Server Code: Handling Image Input
+
+**Handling image messages (step8_main.py:75-89):**
+
+The upstream task detects image messages by checking `type: "image"` in the JSON. It decodes the base64 image data and sends it to the model via `send_realtime()`—the same method used for audio.
+
+```python
+# Handle image data
+elif json_message.get("type") == "image":
+    import base64
+
+    # Decode base64 image data
+    image_data = base64.b64decode(json_message["data"])
+    mime_type = json_message.get("mimeType", "image/jpeg")
+
+    # Send image as blob (same as audio)
+    image_blob = types.Blob(mime_type=mime_type, data=image_data)
+    live_request_queue.send_realtime(image_blob)
+```
+
+**Key points:**
+
+- **Same method as audio**: Both images and audio use `send_realtime()` with `types.Blob`
+- **Base64 decoding**: Client sends base64-encoded image; server decodes to bytes
+- **MIME type**: Preserves the image format (JPEG, PNG) for proper processing
 
 ### Understand Image Format
 
@@ -1453,14 +1492,17 @@ Open `main.py` in the editor to examine the new code. Key additions:
 
 Images are sent the same way as audio—via `send_realtime()`. The model processes them alongside text and audio for multimodal understanding.
 
-### Understanding the Client Code: Camera Capture and Image Sending
+**Why base64 JSON instead of binary frames?** Unlike audio (sent continuously), images are sent occasionally on user action. The ~33% base64 overhead is acceptable, and JSON provides message routing (`type: "image"`) and metadata (`mimeType`) that binary frames can't include without a custom protocol.
+
+### Understanding the Client Code: Camera Capture
 
 The frontend captures images from the camera using Canvas API and sends them as base64-encoded JSON:
 
 **Opening camera preview (app.js:803-830):**
 
+This function requests camera access using the MediaDevices API with 768x768 resolution (matching Live API recommendations). The video stream is displayed in a `<video>` element for live preview before capture.
+
 ```javascript
-// app.js:803-830 - Open camera and start preview
 async function openCameraPreview() {
     // Request camera access
     cameraStream = await navigator.mediaDevices.getUserMedia({
@@ -1479,8 +1521,9 @@ async function openCameraPreview() {
 
 **Capturing and sending an image (app.js:848-904, 906-917):**
 
+When the user clicks capture, this function draws the current video frame to a canvas, converts it to JPEG at 85% quality, then base64-encodes it for transmission. The `sendImage()` function wraps the data in JSON with `type` and `mimeType` fields so the server can route and process it correctly.
+
 ```javascript
-// app.js:848-904 - Capture image from preview
 function captureImageFromPreview() {
     // Create canvas matching video dimensions
     const canvas = document.createElement('canvas');
@@ -1505,7 +1548,6 @@ function captureImageFromPreview() {
     closeCameraPreview();
 }
 
-// app.js:906-917 - Send image to server
 function sendImage(base64Image) {
     if (websocket && websocket.readyState === WebSocket.OPEN) {
         const jsonMessage = JSON.stringify({
@@ -1531,28 +1573,6 @@ Camera → MediaStream → <video> element (preview)
     → live_request_queue.send_realtime()
 ```
 
-**Why base64 for images (not binary)?**
-
-| Approach | Pros | Cons |
-|----------|------|------|
-| Binary frame | Smaller (no encoding overhead) | Can't include metadata |
-| Base64 JSON | Includes mimeType, type field | 33% larger |
-
-For images sent infrequently (on user action), base64 overhead is acceptable. The JSON wrapper lets the server distinguish image messages from text messages using the `type` field.
-
-**Message comparison:**
-
-```javascript
-// Text message
-{"type": "text", "text": "Hello"}
-
-// Image message
-{"type": "image", "data": "/9j/4AAQ...", "mimeType": "image/jpeg"}
-
-// Audio - binary frame (no JSON wrapper)
-[raw PCM bytes]
-```
-
 ### Step 8 Checkpoint
 
 > **What you built**: You completed the full multimodal application! The server now handles text, audio, and image input through the same `LiveRequestQueue` interface. The model can see, hear, and respond with natural speech.
@@ -1563,17 +1583,21 @@ For images sent infrequently (on user action), base64 overhead is acceptable. Th
 
 ### What You Built
 
-You built a complete bidirectional streaming AI application from scratch:
+You built a complete bidirectional streaming AI application from scratch. The application handles text, voice, and image input with real-time streaming responses—the foundation for building production-ready conversational AI.
 
-| Component | What It Does |
-|-----------|--------------|
-| Agent | Defines AI personality and tools |
-| SessionService | Stores conversation history |
-| Runner | Orchestrates streaming lifecycle |
-| LiveRequestQueue | Sends input to model |
-| run_live() | Receives streaming events |
+| Component | What It Does | Step |
+|-----------|--------------|------|
+| Agent | Defines AI personality, instructions, and available tools (e.g., Google Search) | Step 2 |
+| SessionService | Persists conversation history across reconnections | Step 3 |
+| Runner | Orchestrates the streaming lifecycle, connects agent to Live API | Step 3 |
+| RunConfig | Configures response modality (TEXT/AUDIO), transcription, session resumption | Step 4 |
+| LiveRequestQueue | Unified interface for sending text, audio, and images to the model | Step 5 |
+| run_live() | Async generator that yields streaming events from the model | Step 6 |
+| send_realtime() | Sends audio/image blobs for continuous streaming input | Step 7-8 |
 
 ### The 4-Phase Lifecycle
+
+Every ADK streaming application follows this pattern. Understanding these phases helps you structure your code correctly and debug issues effectively.
 
 ```
 Phase 1: Application Init  →  Agent, SessionService, Runner (once)
@@ -1583,6 +1607,8 @@ Phase 4: Termination       →  close() the queue (always in finally)
 ```
 
 ### Key Code Patterns
+
+These are the essential patterns you'll use in every ADK streaming application. Keep this as a quick reference.
 
 ```python
 # Upstream: Send text
@@ -1604,6 +1630,8 @@ finally:
 
 ### Resources
 
+Continue learning with these official resources. The ADK Bidi-streaming Guide provides deeper coverage of everything in this workshop.
+
 | Resource | URL |
 |----------|-----|
 | ADK Documentation | https://google.github.io/adk-docs/ |
@@ -1611,65 +1639,3 @@ finally:
 | Gemini Live API | https://ai.google.dev/gemini-api/docs/live |
 | Vertex AI Live API | https://cloud.google.com/vertex-ai/generative-ai/docs/live-api |
 | ADK Samples Repository | https://github.com/google/adk-samples |
-
-### Next Steps
-
-1. **Read the full guide**: https://google.github.io/adk-docs/streaming/dev-guide/
-2. **Explore multi-agent**: Create agents that hand off conversations
-3. **Deploy to [Cloud Run](https://cloud.google.com/run)**: Scale your streaming app
-4. **Add session resumption**: Handle disconnections gracefully
-5. **Add custom tools**: Build tools that integrate with your backend services
-
----
-
-## Appendix: Troubleshooting
-
-### Common Issues and Solutions
-
-| Issue | Possible Cause | Solution |
-|-------|---------------|----------|
-| Microphone not working | Browser permissions | Check site permissions, ensure HTTPS or localhost |
-| No audio response | Wrong model or modality | Verify native audio model, check `response_modalities=["AUDIO"]` |
-| API key errors | Missing or invalid key | Check `.env` file, verify credentials are set correctly |
-| WebSocket disconnects | Session timeout or error | Check server logs, implement reconnection logic |
-| Slow responses | Network latency | Check connection, consider closer region |
-| "Model not found" | Invalid model name | Check model name spelling, verify availability |
-
-### Debugging Tips
-
-**Enable Debug Logging:**
-
-```python
-import logging
-logging.basicConfig(level=logging.DEBUG)
-```
-
-**Check Server Logs:**
-
-Look for events in the terminal:
-
-```
-[UPSTREAM] User text: Hello
-[DOWNSTREAM] Event: {"content": {"parts": [{"text": "Hi there!"}]}}
-```
-
-**Verify WebSocket Connection:**
-
-Open browser DevTools → Network → WS tab to see WebSocket frames.
-
-**Verify Audio Format:**
-
-Ensure audio is 16kHz mono PCM for input and expect 24kHz mono PCM for output.
-
-### Environment Variables Reference
-
-```bash
-# For Vertex AI (recommended for Cloud Shell)
-GOOGLE_CLOUD_PROJECT=your_project_id
-GOOGLE_CLOUD_LOCATION=us-central1
-GOOGLE_GENAI_USE_VERTEXAI=TRUE
-
-# For Google AI Studio (alternative)
-# Get your API key at https://aistudio.google.com/
-GOOGLE_API_KEY=your_google_ai_studio_api_key
-```
