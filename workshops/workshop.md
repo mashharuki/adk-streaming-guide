@@ -216,6 +216,13 @@ GOOGLE_GENAI_USE_VERTEXAI=TRUE
 
 > **Finding your Project ID**: Run `gcloud projects list` to see your available projects, or check the project dropdown in the Cloud Console header.
 
+Enable the Vertex AI API for your project (replace `your_project_id` with your actual project ID):
+
+```bash
+gcloud config set project your_project_id
+gcloud services enable aiplatform.googleapis.com
+```
+
 **Step 4: Install Dependencies**
 
 Now we'll install all the Python packages defined in pyproject.toml.
@@ -451,6 +458,8 @@ This workshop uses WebSocket for bidirectional audio streaming, but you can also
 Now let's add an actual AI agent to generate real responses.
 
 ### Examine the Agent
+
+No code changes needed for this section—just examine the pre-configured agent.
 
 The agent files were downloaded during setup. Open `my_agent/agent.py` in the editor to examine the code.
 
@@ -837,24 +846,27 @@ Open `main.py` in the editor to examine the new code. Key additions:
 
 The upstream task handles the **client → model** direction. It runs as an infinite loop, waiting for WebSocket messages and forwarding them to the model via `LiveRequestQueue`:
 
-**step5_main.py:66-91**
+**step5_main.py:66-93**
 ```python
 async def upstream_task() -> None:
-    while True:
-        message = await websocket.receive()  # Wait for WebSocket message from the client
+    try:
+        while True:
+            message = await websocket.receive()  # Wait for WebSocket message from the client
 
-        if "text" in message:
-            text_data = message["text"]
-            json_message = json.loads(text_data)  # Parse JSON
+            if "text" in message:
+                text_data = message["text"]
+                json_message = json.loads(text_data)  # Parse JSON
 
-            if json_message.get("type") == "text":
-                user_text = json_message["text"]
+                if json_message.get("type") == "text":
+                    user_text = json_message["text"]
 
-                # Create Content object and send to queue
-                content = types.Content(
-                    parts=[types.Part(text=user_text)]
-                )
-                live_request_queue.send_content(content)
+                    # Create Content object and send to queue
+                    content = types.Content(
+                        parts=[types.Part(text=user_text)]
+                    )
+                    live_request_queue.send_content(content)
+    except WebSocketDisconnect:
+        print("Client disconnected")
 ```
 
 **From the client to FastAPI:**
@@ -890,7 +902,7 @@ The upstream task parses the JSON, extracts the user's text, wraps it in a `type
 
 **Concurrent execution with `asyncio.gather()`:**
 
-**step5_main.py:101**
+**step5_main.py:104**
 ```python
 await asyncio.gather(upstream_task(), downstream_task())
 ```
@@ -971,7 +983,7 @@ Open `main.py` in the editor to examine the new code. Key additions:
 
 ### Understanding the Server Code: run_live()
 
-**step6_main.py:78-93**
+**step6_main.py:81-96**
 ```python
 async def downstream_task() -> None:
     async for event in runner.run_live(
@@ -1122,7 +1134,7 @@ Open `main.py` in the editor to examine the new code. Key additions:
 - **types.Blob**: Creates audio blob with `audio/pcm;rate=16000` MIME type
 - **send_realtime()**: Streams audio continuously (VAD triggers response)
 
-**step7_main.py:86-97** - Binary message handling:
+**step7_main.py:86-98** - Binary message handling:
 ```python
 # Handle binary messages (audio)
 elif "bytes" in message:
@@ -1454,7 +1466,7 @@ Open `main.py` in the editor to examine the new code.
 
 ### Understanding the Server Code: Handling Image Input
 
-**Handling image messages (step8_main.py:75-89):**
+**Handling image messages (step8_main.py:88-103):**
 
 The upstream task detects image messages by checking `type: "image"` in the JSON. It decodes the base64 image data and sends it to the model via `send_realtime()`—the same method used for audio.
 

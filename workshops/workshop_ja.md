@@ -216,6 +216,13 @@ GOOGLE_GENAI_USE_VERTEXAI=TRUE
 
 > **プロジェクトIDの確認方法**: `gcloud projects list`を実行して利用可能なプロジェクトを確認するか、Cloud Consoleヘッダーのプロジェクトドロップダウンを確認してください。
 
+プロジェクトでVertex AI APIを有効化します（`your_project_id`を実際のプロジェクトIDに置き換えてください）：
+
+```bash
+gcloud config set project your_project_id
+gcloud services enable aiplatform.googleapis.com
+```
+
 **ステップ4: 依存関係をインストール**
 
 pyproject.tomlで定義されているすべてのPythonパッケージをインストールします。
@@ -451,6 +458,8 @@ connectWebsocket();
 次に、実際の応答を生成するAIエージェントを追加しましょう。
 
 ### エージェントを確認
+
+このステップではmain.pyファイルのコピーは不要です。事前に記述されたエージェントの内容を確認するだけです。
 
 エージェントファイルはセットアップ時にダウンロードされています。エディタで`my_agent/agent.py`を開いてコードを確認します。
 
@@ -833,24 +842,27 @@ Sent to LiveRequestQueue
 
 アップストリームタスクは**クライアント → モデル**方向のメッセージを処理します。WebSocketが接続中の間は無限ループとしてメッセージの到着を待機し、届いたメッセージを`LiveRequestQueue`経由でモデルに転送します：
 
-**step5_main.py:66-91**
+**step5_main.py:66-93**
 ```python
 async def upstream_task() -> None:
-    while True:
-        message = await websocket.receive()  # クライアントからのWebSocketメッセージを待機
+    try:
+        while True:
+            message = await websocket.receive()  # クライアントからのWebSocketメッセージを待機
 
-        if "text" in message:
-            text_data = message["text"]
-            json_message = json.loads(text_data)  # JSONをパース
+            if "text" in message:
+                text_data = message["text"]
+                json_message = json.loads(text_data)  # JSONをパース
 
-            if json_message.get("type") == "text":
-                user_text = json_message["text"]
+                if json_message.get("type") == "text":
+                    user_text = json_message["text"]
 
-                # Contentオブジェクトを作成してキューに送信
-                content = types.Content(
-                    parts=[types.Part(text=user_text)]
-                )
-                live_request_queue.send_content(content)
+                    # Contentオブジェクトを作成してキューに送信
+                    content = types.Content(
+                        parts=[types.Part(text=user_text)]
+                    )
+                    live_request_queue.send_content(content)
+    except WebSocketDisconnect:
+        print("Client disconnected")
 ```
 
 **クライアントからFastAPIへ:**
@@ -886,7 +898,7 @@ FastAPIはWebSocketフレームを受信し、フレームタイプに応じて`
 
 **`asyncio.gather()`による並行実行:**
 
-**step5_main.py:101**
+**step5_main.py:104**
 ```python
 await asyncio.gather(upstream_task(), downstream_task())
 ```
@@ -967,7 +979,7 @@ python -m uvicorn main:app --host 0.0.0.0 --port 8080
 
 ### サーバーコードを理解する: run_live()
 
-**step6_main.py:78-93**
+**step6_main.py:81-96**
 ```python
 async def downstream_task() -> None:
     async for event in runner.run_live(
@@ -1118,7 +1130,7 @@ python -m uvicorn main:app --host 0.0.0.0 --port 8080
 - **types.Blob**: `audio/pcm;rate=16000` MIMEタイプで音声blobを作成
 - **send_realtime()**: 音声を継続的にストリーム（VADが応答をトリガー）
 
-**step7_main.py:86-97** - バイナリメッセージ処理：
+**step7_main.py:86-98** - バイナリメッセージ処理：
 ```python
 # バイナリメッセージ（音声）を処理
 elif "bytes" in message:
@@ -1448,7 +1460,7 @@ python -m uvicorn main:app --host 0.0.0.0 --port 8080
 
 ### サーバーコードを理解する: 画像入力の処理
 
-**画像メッセージの処理 (step8_main.py:75-89):**
+**画像メッセージの処理 (step8_main.py:88-103):**
 
 アップストリームタスクはJSONの`type: "image"`をチェックして画像メッセージを検出します。base64画像データをデコードし、`send_realtime()`経由でモデルに送信します—音声と同じメソッドです。
 
