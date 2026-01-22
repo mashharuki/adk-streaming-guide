@@ -35,7 +35,7 @@ sequenceDiagram
 
 **[Agent Development Kit (ADK)](https://google.github.io/adk-docs/)** は[Gemini Live API](https://ai.google.dev/gemini-api/docs/live)上の高レベルな抽象化を提供し、リアルタイムストリーミングの複雑な仕組みを処理することで、アプリケーション構築に集中できるようにします。
 
-![ADKはLive API通信の複雑さを抽象化](assets/bidi_plumbing.webp)
+![ADKはLive API通信の複雑さを抽象化](https://raw.githubusercontent.com/kazunori279/adk-streaming-guide/refs/heads/main/workshops/assets/bidi_plumbing.webp)
 
 ADK Bidi-streamingが管理するもの：
 
@@ -48,7 +48,7 @@ ADK Bidi-streamingが管理するもの：
 
 Gemini Live API上で直接構築することもできますが、ADKが複雑なインフラを処理するので、アプリケーションに集中できます：
 
-![生のLive API vs. ADK Bidi-streaming](assets/live_vs_adk.png)
+![生のLive API vs. ADK Bidi-streaming](https://raw.githubusercontent.com/kazunori279/adk-streaming-guide/refs/heads/main/workshops/assets/live_vs_adk.png)
 
 | 機能 | 生のLive API | ADK Bidi-streaming |
 |------|--------------|-------------------|
@@ -104,7 +104,7 @@ Gemini Live API上で直接構築することもできますが、ADKが複雑�
 
 ドキュメントを読むだけではなく、**各コンポーネントをステップバイステップで調べ**、段階的に構築しながらそれらをどのように組み合わせていくかを理解します。
 
-![ADK Bidi-streaming デモ](../docs/assets/bidi-demo-screen.png)
+![ADK Bidi-streaming デモ](https://raw.githubusercontent.com/kazunori279/adk-streaming-guide/refs/heads/main/docs/assets/bidi-demo-screen.png)
 
 ### 学習アプローチ
 
@@ -139,13 +139,13 @@ Gemini Live API上で直接構築することもできますが、ADKが複雑�
 
 ブラウザで[ide.cloud.google.com](https://ide.cloud.google.com)に移動します。右側のGeminiパネルを閉じてください（このワークショップでは使用しません）。
 
-![](assets/cloud_shell_editor.png)
+![](https://raw.githubusercontent.com/kazunori279/adk-streaming-guide/refs/heads/main/workshops/assets/cloud_shell_editor.png)
 
 **ステップ2: ワークショップファイルをダウンロード**
 
 Cloud Shell Editorでターミナルを開きます（**Terminal** → **New Terminal**）：
 
-![Refresh Explorerボタン](assets/new_terminal.png)
+![Refresh Explorerボタン](https://raw.githubusercontent.com/kazunori279/adk-streaming-guide/refs/heads/main/workshops/assets/new_terminal.png)
 
 ワークショップファイルをダウンロードします：
 
@@ -190,7 +190,7 @@ bidi-workshop/
 
 **ステップ3: 環境変数を設定**
 
-テンプレートファイルをコピーします：
+新しいターミナルを再度開き、テンプレートファイルをリネームしてGoogle CloudプロジェクトIDを編集します：
 
 ```bash
 cd ~/bidi-workshop/app
@@ -199,7 +199,7 @@ cp .env.template .env
 
 Explorerパネルの**Refresh Explorer**ボタンをクリックして、新しいファイルを表示します。
 
-![Refresh Explorerボタン](assets/refresh_explorer.png)
+![Refresh Explorerボタン](https://raw.githubusercontent.com/kazunori279/adk-streaming-guide/refs/heads/main/workshops/assets/refresh_explorer.png)
 
 次に`app/.env`を編集し、`your_project_id`をプロジェクトIDに置き換えます：
 
@@ -246,7 +246,7 @@ pip install -e .
 
 ### 高レベルアーキテクチャ
 
-![ADK Bidi-streamingの高レベルアーキテクチャ](assets/Bidi_arch.jpeg)
+![ADK Bidi-streamingの高レベルアーキテクチャ](https://raw.githubusercontent.com/kazunori279/adk-streaming-guide/refs/heads/main/workshops/assets/Bidi_arch.jpeg)
 
 アーキテクチャは3つの主要レイヤーで構成されています：
 
@@ -288,18 +288,18 @@ INFO:     Application startup complete.
 
 **Web Preview**ボタンをクリックし、**Preview on port 8080**を選択します。
 
-![Web Previewボタン](assets/web_preview.png)
+![Web Previewボタン](https://raw.githubusercontent.com/kazunori279/adk-streaming-guide/refs/heads/main/workshops/assets/web_preview.png)
 
 ブラウザにデモ画面が表示されます。右上隅に**Connected**インジケーターが表示されることを確認してください—これはWebSocket接続が機能していることを確認するものです。
 
-![Connected](assets/connected.png)
+![Connected](https://raw.githubusercontent.com/kazunori279/adk-streaming-guide/refs/heads/main/workshops/assets/connected.png)
 
 **テストする:**
 1. テキスト入力に「Hello」と入力
 2. Sendをクリック
 3. チャットに「Echo: {"type": "text", "text": "Hello"}」と表示されるはずです
 
-![Echo: hello](assets/echo_hello.png)
+![Echo: hello](https://raw.githubusercontent.com/kazunori279/adk-streaming-guide/refs/heads/main/workshops/assets/echo_hello.png)
 
 エディタで`main.py`を開いてコードを確認します。主要コンポーネント：
 
@@ -522,7 +522,7 @@ from google.adk.tools import google_search
 - [Gemini Live APIモデル](https://ai.google.dev/gemini-api/docs/models#live-models) — Google AI Studio（**Gemini 2.5 Flash Live**を参照）
 - [Vertex AI Live APIモデル](https://cloud.google.com/vertex-ai/generative-ai/docs/live-api#supported-models) — Google Cloud
 
-![Live APIモデル](assets/vertex_ai_live_models.png)
+![Live APIモデル](https://raw.githubusercontent.com/kazunori279/adk-streaming-guide/refs/heads/main/workshops/assets/vertex_ai_live_models.png)
 
 ### ステップ2チェックポイント
 
@@ -536,7 +536,7 @@ from google.adk.tools import google_search
 
 すべてのBidi-streamingアプリケーションは以下のライフサイクルに従います：
 
-![4フェーズアプリケーションライフサイクル](assets/app_lifecycle.png)
+![4フェーズアプリケーションライフサイクル](https://raw.githubusercontent.com/kazunori279/adk-streaming-guide/refs/heads/main/workshops/assets/app_lifecycle.png)
 
 | フェーズ | タイミング | 何が起こるか |
 |----------|-----------|--------------|
@@ -702,7 +702,7 @@ Session initialized with config: streaming_mode=<StreamingMode.BIDI: 'bidi'>
 | `realtime_input_config` | Voice Activity Detection (VAD)の動作を設定 |
 | `save_live_blob` | 音声/動画ストリームをストレージに保存 |
 
-![RunConfig設定オプション](assets/runconfig.png)
+![RunConfig設定オプション](https://raw.githubusercontent.com/kazunori279/adk-streaming-guide/refs/heads/main/workshops/assets/runconfig.png)
 
 ### LiveRequestQueueを理解する
 
@@ -713,7 +713,7 @@ Session initialized with config: streaming_mode=<StreamingMode.BIDI: 'bidi'>
 live_request_queue = LiveRequestQueue()
 ```
 
-![LiveRequestQueueメソッド](assets/live_req_queue.png)
+![LiveRequestQueueメソッド](https://raw.githubusercontent.com/kazunori279/adk-streaming-guide/refs/heads/main/workshops/assets/live_req_queue.png)
 
 | メソッド | ユースケース | 応答のタイミング |
 |----------|-------------|-----------------|
@@ -971,7 +971,7 @@ python -m uvicorn main:app --host 0.0.0.0 --port 8080
 2. モデルが応答している間に、「止めて」と入力して送信
 3. Event Consoleを観察—`interrupted`イベントが表示され、その後モデルが新しいメッセージへの応答を開始します
 
-![Interrupt](assets/interrupt.png)
+![Interrupt](https://raw.githubusercontent.com/kazunori279/adk-streaming-guide/refs/heads/main/workshops/assets/interrupt.png)
 
 エディタで`main.py`を開いて新しいコードを確認します。主な追加点：
 
@@ -1014,7 +1014,7 @@ async def downstream_task() -> None:
 | ターン完了 | `event.turn_complete` | モデルが現在の入力への応答を完了 |
 | 割り込み | `event.interrupted` | ユーザーがモデルを割り込み（例：モデルが応答中に話した） |
 
-![ADK Liveイベント処理の包括的なサマリー](assets/run_live.png)
+![ADK Liveイベント処理の包括的なサマリー](https://raw.githubusercontent.com/kazunori279/adk-streaming-guide/refs/heads/main/workshops/assets/run_live.png)
 
 **`model_dump_json()`でイベントをシリアライズ:** このデモでは、ダウンストリームタスクの中でイベントの中身を処理するのではなく、そのままクライアントに転送します。そして、クライアント側のJavaScriptがイベント内容の解析と処理を担当します。ADKのイベントはPydanticモデルなので、`model_dump_json()`を使用してJSON文字列に変換できます：
 
@@ -1172,7 +1172,7 @@ Live APIには音声入出力に特定の要件があります：
 | チャンネル | モノラル |
 | 配信 | イベントの`inline_data`としてストリーム |
 
-![ADK Live APIマルチモーダル機能の包括的なサマリー](assets/multimodal.png)
+![ADK Live APIマルチモーダル機能の包括的なサマリー](https://raw.githubusercontent.com/kazunori279/adk-streaming-guide/refs/heads/main/workshops/assets/multimodal.png)
 
 
 #### Voice Activity Detection (VAD)

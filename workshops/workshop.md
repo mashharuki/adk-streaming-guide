@@ -195,7 +195,7 @@ Each `stepN_main.py` file is a complete, working version for that step. Copy it 
 
 **Step 3: Configure Environment Variables**
 
-Rename the template file and edit it with your Google Cloud project ID:
+Open the New Terminal again, and rename the template file and edit it with your Google Cloud project ID:
 
 ```bash
 cd ~/bidi-workshop/app
