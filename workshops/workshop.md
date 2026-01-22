@@ -148,12 +148,7 @@ Navigate to [ide.cloud.google.com](https://ide.cloud.google.com) in your browser
 
 **Step 2: Download Workshop Files**
 
-Open a terminal in Cloud Shell Editor (**Terminal** → **New Terminal**):
-
-![Refresh Explorer button](assets/new_terminal.png)
-
-Download the workshop files:
-
+Open a terminal in Cloud Shell Editor and download the workshop files with the following commands:
 
 ```bash
 mkdir -p ~/bidi-workshop && cd ~/bidi-workshop
@@ -195,18 +190,22 @@ Each `stepN_main.py` file is a complete, working version for that step. Copy it 
 
 **Step 3: Configure Environment Variables**
 
-Open the New Terminal again, and rename the template file and edit it with your Google Cloud project ID:
+Open a New Terminal (**Terminal** → **New Terminal**):
+
+![Open New Terminal](assets/new_terminal.png)
+
+Copy the template file and edit it with your Google Cloud project ID:
 
 ```bash
 cd ~/bidi-workshop/app
 cp .env.template .env
 ```
 
-Click the **Refresh Explorer** button in the Explorer panel to see the new file. 
+If you don't see the `.env` file on the Explorer, click the **Refresh Explorer** button in the Explorer panel to see the new file. 
 
 ![Refresh Explorer button](assets/refresh_explorer.png)
 
-Then edit `app/.env` and replace `your_project_id` with your project ID:
+Edit `app/.env` and replace `your_project_id` with your project ID:
 
 ```bash
 GOOGLE_CLOUD_PROJECT=your_project_id
@@ -214,13 +213,12 @@ GOOGLE_CLOUD_LOCATION=us-central1
 GOOGLE_GENAI_USE_VERTEXAI=TRUE
 ```
 
-> **Finding your Project ID**: Run `gcloud projects list` to see your available projects, or check the project dropdown in the Cloud Console header.
+> **Finding your Project ID**: Check Cloud overview > Dashboard > Project info in the Cloud Console.
 
 Enable the Vertex AI API for your project (replace `your_project_id` with your actual project ID):
 
 ```bash
-gcloud config set project your_project_id
-gcloud services enable aiplatform.googleapis.com
+gcloud services enable aiplatform.googleapis.com --project=your_project_id
 ```
 
 **Step 4: Install Dependencies**

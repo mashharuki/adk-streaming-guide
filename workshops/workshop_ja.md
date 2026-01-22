@@ -143,12 +143,7 @@ Gemini Live API上で直接構築することもできますが、ADKが複雑�
 
 **ステップ2: ワークショップファイルをダウンロード**
 
-Cloud Shell Editorでターミナルを開きます（**Terminal** → **New Terminal**）：
-
-![Refresh Explorerボタン](https://raw.githubusercontent.com/kazunori279/adk-streaming-guide/refs/heads/main/workshops/assets/new_terminal.png)
-
-ワークショップファイルをダウンロードします：
-
+Cloud Shell Editorでターミナルを開き、以下のコマンドでワークショップファイルをダウンロードします：
 
 ```bash
 mkdir -p ~/bidi-workshop && cd ~/bidi-workshop
@@ -190,18 +185,22 @@ bidi-workshop/
 
 **ステップ3: 環境変数を設定**
 
-新しいターミナルを再度開き、テンプレートファイルをリネームしてGoogle CloudプロジェクトIDを編集します：
+新しいターミナルを開きます（**Terminal** → **New Terminal**）：
+
+![新しいターミナルを開く](https://raw.githubusercontent.com/kazunori279/adk-streaming-guide/refs/heads/main/workshops/assets/new_terminal.png)
+
+テンプレートファイルをコピーし、Google CloudプロジェクトIDを設定します：
 
 ```bash
 cd ~/bidi-workshop/app
 cp .env.template .env
 ```
 
-Explorerパネルの**Refresh Explorer**ボタンをクリックして、新しいファイルを表示します。
+Explorerに`.env`ファイルが表示されない場合は、Explorerパネルの**Refresh Explorer**ボタンをクリックして新しいファイルを表示します。
 
 ![Refresh Explorerボタン](https://raw.githubusercontent.com/kazunori279/adk-streaming-guide/refs/heads/main/workshops/assets/refresh_explorer.png)
 
-次に`app/.env`を編集し、`your_project_id`をプロジェクトIDに置き換えます：
+`app/.env`を編集し、`your_project_id`をプロジェクトIDに置き換えます：
 
 ```bash
 GOOGLE_CLOUD_PROJECT=your_project_id
@@ -209,13 +208,12 @@ GOOGLE_CLOUD_LOCATION=us-central1
 GOOGLE_GENAI_USE_VERTEXAI=TRUE
 ```
 
-> **プロジェクトIDの確認方法**: `gcloud projects list`を実行して利用可能なプロジェクトを確認するか、Cloud Consoleヘッダーのプロジェクトドロップダウンを確認してください。
+> **プロジェクトIDの確認方法**: Cloud Consoleの「Cloud overview」→「Dashboard」→「Project info」で確認できます。
 
 プロジェクトでVertex AI APIを有効化します（`your_project_id`を実際のプロジェクトIDに置き換えてください）：
 
 ```bash
-gcloud config set project your_project_id
-gcloud services enable aiplatform.googleapis.com
+gcloud services enable aiplatform.googleapis.com --project=your_project_id
 ```
 
 **ステップ4: 依存関係をインストール**
