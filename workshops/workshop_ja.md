@@ -729,7 +729,7 @@ live_request_queue = LiveRequestQueue()
 
 **step4_main.py:101-108** - 常にfinallyでクローズ：
 ```python
-except WebSocketDisconnect:
+except (WebSocketDisconnect, RuntimeError):
     print("Client disconnected")
 finally:
     # フェーズ4: 終了 - 常にキューをクローズ
@@ -895,7 +895,7 @@ FastAPIはWebSocketフレームを受信し、フレームタイプに応じて`
 ```python
 try:
     await asyncio.gather(upstream_task(), downstream_task())
-except WebSocketDisconnect:
+except (WebSocketDisconnect, RuntimeError):
     print("Client disconnected")
 finally:
     live_request_queue.close()
@@ -906,7 +906,7 @@ finally:
 - **upstream_task**: WebSocketから受信 → モデルに送信
 - **downstream_task**: モデルから受信 → WebSocketに送信
 
-クライアントが切断すると、`WebSocketDisconnect`が`upstream_task`から伝播し、両タスクがキャンセルされます。`finally`ブロックにより、常にクリーンアップが実行されます。
+クライアントが切断すると、`WebSocketDisconnect`が`upstream_task`から伝播し、両タスクがキャンセルされます。ブラウザのリロード時には接続が突然閉じられ`RuntimeError`が発生する場合があるため、これもキャッチしています。`finally`ブロックにより、常にクリーンアップが実行されます。
 
 ### クライアントコードを理解する: テキストメッセージの送信
 

@@ -742,7 +742,7 @@ live_request_queue = LiveRequestQueue()
 
 **step4_main.py:101-108** - Always close in `finally`:
 ```python
-except WebSocketDisconnect:
+except (WebSocketDisconnect, RuntimeError):
     print("Client disconnected")
 finally:
     # Phase 4: Termination - always close the queue
@@ -909,7 +909,7 @@ The upstream task parses the JSON, extracts the user's text, wraps it in a `type
 ```python
 try:
     await asyncio.gather(upstream_task(), downstream_task())
-except WebSocketDisconnect:
+except (WebSocketDisconnect, RuntimeError):
     print("Client disconnected")
 finally:
     live_request_queue.close()
@@ -920,7 +920,7 @@ This runs both tasks simultaneously (we'll implement `downstream_task()` in the 
 - **upstream_task**: Receives from WebSocket → sends to model
 - **downstream_task**: Receives from model → sends to WebSocket
 
-When the client disconnects, `WebSocketDisconnect` propagates from `upstream_task`, canceling both tasks. The `finally` block ensures cleanup always happens.
+When the client disconnects, `WebSocketDisconnect` propagates from `upstream_task`, canceling both tasks. We also catch `RuntimeError` to handle browser reloads gracefully, which can raise this error when the connection closes abruptly. The `finally` block ensures cleanup always happens.
 
 ### Understanding the Client Code: Sending Text Messages
 
