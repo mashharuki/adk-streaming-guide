@@ -130,7 +130,7 @@ async def websocket_endpoint(
 
     try:
         await asyncio.gather(upstream_task(), downstream_task())
-    except WebSocketDisconnect:
+    except (WebSocketDisconnect, RuntimeError):
         print("Client disconnected")
     finally:
         live_request_queue.close()

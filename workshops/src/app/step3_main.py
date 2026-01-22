@@ -74,5 +74,5 @@ async def websocket_endpoint(
                 await websocket.send_text(json.dumps(response))
                 await websocket.send_text(json.dumps({"turnComplete": True}))
 
-    except WebSocketDisconnect:
+    except (WebSocketDisconnect, RuntimeError):
         print("Client disconnected")

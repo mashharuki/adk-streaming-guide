@@ -53,5 +53,5 @@ async def websocket_endpoint(
                 print(f"Received binary: {len(message['bytes'])} bytes")
                 # Ignore binary for now
 
-    except WebSocketDisconnect:
+    except (WebSocketDisconnect, RuntimeError):
         print("Client disconnected")
