@@ -148,7 +148,11 @@ Navigate to [ide.cloud.google.com](https://ide.cloud.google.com) in your browser
 
 **Step 2: Download Workshop Files**
 
-Open a terminal in Cloud Shell Editor and download the workshop files with the following commands:
+Open a New Terminal (**Terminal** → **New Terminal**):
+
+![Open New Terminal](assets/new_terminal.png)
+
+In the terminal, download the workshop files with the following commands:
 
 ```bash
 mkdir -p ~/bidi-workshop && cd ~/bidi-workshop
@@ -190,11 +194,7 @@ Each `stepN_main.py` file is a complete, working version for that step. Copy it 
 
 **Step 3: Configure Environment Variables**
 
-Open a New Terminal (**Terminal** → **New Terminal**):
-
-![Open New Terminal](assets/new_terminal.png)
-
-Copy the template file and edit it with your Google Cloud project ID:
+Open a new Terminal, and copy the template file with the following commands:
 
 ```bash
 cd ~/bidi-workshop/app

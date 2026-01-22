@@ -143,7 +143,11 @@ Gemini Live API上で直接構築することもできますが、ADKが複雑�
 
 **ステップ2: ワークショップファイルをダウンロード**
 
-Cloud Shell Editorでターミナルを開き、以下のコマンドでワークショップファイルをダウンロードします：
+新しいターミナルを開きます（**Terminal** → **New Terminal**）：
+
+![新しいターミナルを開く](https://raw.githubusercontent.com/kazunori279/adk-streaming-guide/refs/heads/main/workshops/assets/new_terminal.png)
+
+ターミナルで、以下のコマンドを実行してワークショップファイルをダウンロードします：
 
 ```bash
 mkdir -p ~/bidi-workshop && cd ~/bidi-workshop
@@ -185,11 +189,7 @@ bidi-workshop/
 
 **ステップ3: 環境変数を設定**
 
-新しいターミナルを開きます（**Terminal** → **New Terminal**）：
-
-![新しいターミナルを開く](https://raw.githubusercontent.com/kazunori279/adk-streaming-guide/refs/heads/main/workshops/assets/new_terminal.png)
-
-テンプレートファイルをコピーし、Google CloudプロジェクトIDを設定します：
+新しいターミナルを開き、以下のコマンドでテンプレートファイルをコピーします：
 
 ```bash
 cd ~/bidi-workshop/app
