@@ -1,7 +1,9 @@
-"""Step 5: Upstream task - sending text to the model."""
+"""Step 8: Add image input for multimodal AI."""
 
 import asyncio
+import base64
 import json
+import warnings
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -14,25 +16,34 @@ from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 from google.genai import types
 
+# Suppress noisy warnings
+warnings.filterwarnings("ignore", message="Your application has authenticated using end user credentials")
+warnings.filterwarnings("ignore", category=UserWarning, module="pydantic")
+
+# 環境変数の読み込み
 load_dotenv(Path(__file__).parent / ".env")
 
 from my_agent.agent import agent  # noqa: E402
 
 APP_NAME = "bidi-workshop"
 
+# FastAPIインスタンス化
 app = FastAPI()
+# 静的アセットの設定
 static_dir = Path(__file__).parent / "static"
 app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
+# メモリセッション用の機能を設定
 session_service = InMemorySessionService()
+# Runnerインスタンスの初期化
 runner = Runner(app_name=APP_NAME, agent=agent, session_service=session_service)
 
-
+# デフォルトのエンドポイント
 @app.get("/")
 async def root():
     return FileResponse(Path(__file__).parent / "static" / "index.html")
 
-
+# WebSocket用のAPI
 @app.websocket("/ws/{user_id}/{session_id}")
 async def websocket_endpoint(
     websocket: WebSocket,
@@ -40,8 +51,8 @@ async def websocket_endpoint(
     session_id: str,
 ) -> None:
     await websocket.accept()
+    print("Connection open")
 
-    # Phase 2: Session Initialization
     run_config = RunConfig(
         streaming_mode=StreamingMode.BIDI,
         response_modalities=["AUDIO"],
@@ -59,45 +70,70 @@ async def websocket_endpoint(
 
     live_request_queue = LiveRequestQueue()
 
-    # ========================================
-    # Phase 3: Upstream Task
-    # ========================================
-
     async def upstream_task() -> None:
         """Receives messages from WebSocket and sends to LiveRequestQueue."""
-        print("Upstream task started")
-
         while True:
             message = await websocket.receive()
 
+            # Handle text messages (JSON)
             if "text" in message:
-                text_data = message["text"]
-                json_message = json.loads(text_data)
+                json_message = json.loads(message["text"])
 
+                # Handle text messages
                 if json_message.get("type") == "text":
                     user_text = json_message["text"]
-                    print(f"User said: {user_text}")
+                    print(f"[UPSTREAM] Text: {user_text}")
 
-                    # Create Content object and send to queue
                     content = types.Content(
                         parts=[types.Part(text=user_text)]
                     )
                     live_request_queue.send_content(content)
-                    print("Sent to LiveRequestQueue")
 
+                # Handle image messages
+                elif json_message.get("type") == "image":
+                    print("[UPSTREAM] Image received")
+
+                    # Decode base64 image data
+                    image_data = base64.b64decode(json_message["data"])
+                    mime_type = json_message.get("mimeType", "image/jpeg")
+
+                    print(f"[UPSTREAM] Image: {len(image_data)} bytes, {mime_type}")
+
+                    # Create image blob and send
+                    image_blob = types.Blob(
+                        mime_type=mime_type,
+                        data=image_data
+                    )
+                    live_request_queue.send_realtime(image_blob)
+
+            # Handle binary messages (audio)
             elif "bytes" in message:
-                # Audio handling will come later
-                print(f"Received audio: {len(message['bytes'])} bytes")
+                audio_data = message["bytes"]
+                print(f"[UPSTREAM] Audio chunk: {len(audio_data)} bytes")
+
+                audio_blob = types.Blob(
+                    mime_type="audio/pcm;rate=16000",
+                    data=audio_data
+                )
+                live_request_queue.send_realtime(audio_blob)
 
     async def downstream_task() -> None:
-        """Placeholder - will receive events from run_live()."""
-        print("Downstream task started (placeholder)")
-        # Keep task alive
-        while True:
-            await asyncio.sleep(1)
+        """Receives Events from run_live() and sends to WebSocket."""
+        print("[DOWNSTREAM] Starting run_live()")
+
+        async for event in runner.run_live(
+            user_id=user_id,
+            session_id=session_id,
+            live_request_queue=live_request_queue,
+            run_config=run_config,
+        ):
+            event_json = event.model_dump_json(exclude_none=True, by_alias=True)
+            print(f"[DOWNSTREAM] Event: {event_json[:100]}...")
+            await websocket.send_text(event_json)
+
+        print("[DOWNSTREAM] run_live() completed")
 
     try:
-        # Run both tasks concurrently
         await asyncio.gather(upstream_task(), downstream_task())
     except (WebSocketDisconnect, RuntimeError):
         print("Client disconnected")
