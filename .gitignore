@@ -77,3 +77,5 @@ src/demo/server.log
 
 # E2E tests
 tests/e2e/tmp/
+
+google-cloud-sdk
