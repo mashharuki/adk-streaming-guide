@@ -29,6 +29,7 @@ GOOGLE_GENAI_USE_VERTEXAI=TRUE
 ### 音声エージェントの立ち上げ
 
 ```bash
+cd app
 python -m uvicorn main:app --host 0.0.0.0 --port 8080
 ```
 
