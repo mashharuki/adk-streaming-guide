@@ -31,3 +31,6 @@ GOOGLE_GENAI_USE_VERTEXAI=TRUE
 ```bash
 python -m uvicorn main:app --host 0.0.0.0 --port 8080
 ```
+
+## 参考文献
+- [GitHub -adk-samples](https://github.com/google/adk-samples/tree/main)
