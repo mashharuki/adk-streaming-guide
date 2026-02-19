@@ -64,7 +64,8 @@ docker run --rm -p 8080:8080 voice-agent-backend \
 ### CloudRunからデストロイ
 
 ```bash
-FORCE=true DELETE_SA=true ./app/cleanup.sh
+# Artifact Registryまでまとめて削除
+FORCE=true DELETE_SA=true DELETE_AR_REPOSITORY=true ./app/cleanup.sh
 ```
 
 ### PWA の確認
