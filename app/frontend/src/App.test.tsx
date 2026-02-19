@@ -413,4 +413,106 @@ describe("App shell", () => {
     fireEvent.click(screen.getByRole("button", { name: "ログをクリア" }));
     expect(screen.queryByTestId("event-log-item")).not.toBeInTheDocument();
   });
+
+  it("provides runconfig toggles for proactivity and affective dialog", () => {
+    render(<App />);
+
+    expect(screen.getByRole("checkbox", { name: "Proactivity" })).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "Affective Dialog" })).toBeInTheDocument();
+  });
+
+  it("sends runconfig contract format and shows applying state during reconnect", () => {
+    vi.useFakeTimers();
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "接続開始" }));
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+    expect(screen.getByTestId("connection-state")).toHaveTextContent("接続済み");
+
+    const proactivityCheckbox = screen.getByRole("checkbox", { name: "Proactivity" });
+    const affectiveCheckbox = screen.getByRole("checkbox", { name: "Affective Dialog" });
+    fireEvent.click(proactivityCheckbox);
+
+    expect(screen.getByTestId("run-config-query")).toHaveTextContent("proactivity=true&affective_dialog=false");
+    expect(screen.getByTestId("run-config-status")).toHaveTextContent("反映中");
+    expect(screen.getByTestId("connection-state")).toHaveTextContent("再接続中");
+    expect(proactivityCheckbox).toBeDisabled();
+    expect(affectiveCheckbox).toBeDisabled();
+
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+
+    expect(screen.getByTestId("connection-state")).toHaveTextContent("接続済み");
+    expect(screen.getByTestId("run-config-status")).toHaveTextContent("待機");
+    expect(proactivityCheckbox).not.toBeDisabled();
+    expect(screen.getByTestId("run-config-effective")).toHaveTextContent("proactivity=true");
+    vi.useRealTimers();
+  });
+
+  it("reflects backend runconfig apply result and updates effective values", () => {
+    vi.useFakeTimers();
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "接続開始" }));
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "Proactivity" }));
+    expect(screen.getByTestId("run-config-status")).toHaveTextContent("反映中");
+
+    act(() => {
+      dispatchMockStreamEvent({
+        kind: "runConfigApplyResult",
+        status: "applied",
+        effective: { proactivity: true, affectiveDialog: false }
+      });
+    });
+
+    expect(screen.getByTestId("run-config-status")).toHaveTextContent("待機");
+    expect(screen.getByTestId("run-config-effective")).toHaveTextContent("proactivity=true");
+    expect(screen.getByTestId("run-config-drift")).toHaveTextContent("一致");
+    vi.useRealTimers();
+  });
+
+  it("falls back to last successful runconfig and shows failure notice on rejected apply result", () => {
+    vi.useFakeTimers();
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "接続開始" }));
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "Proactivity" }));
+    act(() => {
+      dispatchMockStreamEvent({
+        kind: "runConfigApplyResult",
+        status: "applied",
+        effective: { proactivity: true, affectiveDialog: false }
+      });
+    });
+    expect(screen.getByTestId("run-config-effective")).toHaveTextContent("proactivity=true");
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "Affective Dialog" }));
+    expect(screen.getByTestId("run-config-status")).toHaveTextContent("反映中");
+    act(() => {
+      dispatchMockStreamEvent({
+        kind: "runConfigApplyResult",
+        status: "rejected",
+        effective: { proactivity: true, affectiveDialog: false },
+        reason: "unsupported option"
+      });
+    });
+
+    expect(screen.getByTestId("run-config-status")).toHaveTextContent("待機");
+    expect(screen.getByTestId("run-config-effective")).toHaveTextContent("proactivity=true");
+    expect(screen.getByTestId("run-config-effective")).toHaveTextContent("affectiveDialog=false");
+    expect(screen.getByTestId("run-config-drift")).toHaveTextContent("不一致");
+    expect(screen.getByTestId("system-notices")).toHaveTextContent("設定反映に失敗");
+    vi.useRealTimers();
+  });
 });

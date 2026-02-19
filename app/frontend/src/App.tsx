@@ -15,6 +15,10 @@ type ConversationMessage = {
 };
 type EventLogCategory = "notification" | "conversation";
 type EventLogKind = "standard" | "audio";
+type RunConfigOptions = {
+  proactivity: boolean;
+  affectiveDialog: boolean;
+};
 type EventLogEntry = {
   id: string;
   timestamp: string;
@@ -33,6 +37,12 @@ type MockStreamEvent =
   | {
       kind: "audioOutput";
       chunkSize: number;
+    }
+  | {
+      kind: "runConfigApplyResult";
+      status: "applied" | "rejected" | "unsupported";
+      effective: RunConfigOptions;
+      reason?: string;
     }
   | { kind: "turnComplete" }
   | { kind: "interrupted" };
@@ -76,6 +86,20 @@ export function App(): JSX.Element {
   const [eventLogs, setEventLogs] = useState<EventLogEntry[]>([]);
   const [expandedEventLogIds, setExpandedEventLogIds] = useState<string[]>([]);
   const [showAudioEventLogs, setShowAudioEventLogs] = useState(true);
+  const [desiredRunConfig, setDesiredRunConfig] = useState<RunConfigOptions>({
+    proactivity: false,
+    affectiveDialog: false
+  });
+  const [effectiveRunConfig, setEffectiveRunConfig] = useState<RunConfigOptions>({
+    proactivity: false,
+    affectiveDialog: false
+  });
+  const [lastSuccessfulRunConfig, setLastSuccessfulRunConfig] = useState<RunConfigOptions>({
+    proactivity: false,
+    affectiveDialog: false
+  });
+  const [runConfigStatus, setRunConfigStatus] = useState<"idle" | "applying">("idle");
+  const [lastRunConfigQuery, setLastRunConfigQuery] = useState("proactivity=false&affective_dialog=false");
   const [isCameraModalOpen, setIsCameraModalOpen] = useState(false);
   const [cameraActive, setCameraActive] = useState(false);
   const previousConnectionState = useRef(initialConnectionState);
@@ -154,9 +178,18 @@ export function App(): JSX.Element {
         setSystemNotices((items) => [...items, "再接続に成功"]);
         appendEventLog("notification", "再接続に成功", { phase: "recover" });
       }
+      if (prev === "reconnecting" && connectionState === "connected" && runConfigStatus === "applying") {
+        setEffectiveRunConfig(desiredRunConfig);
+        setRunConfigStatus("idle");
+        setSystemNotices((items) => [...items, "設定変更を反映しました"]);
+        appendEventLog("notification", "RunConfig反映完了", {
+          proactivity: desiredRunConfig.proactivity,
+          affectiveDialog: desiredRunConfig.affectiveDialog
+        });
+      }
       previousConnectionState.current = connectionState;
     }
-  }, [appendEventLog, connectionState]);
+  }, [appendEventLog, connectionState, desiredRunConfig, runConfigStatus]);
 
   useEffect(() => {
     if (!reconnectScheduled) {
@@ -252,6 +285,37 @@ export function App(): JSX.Element {
         return;
       }
 
+      if (streamEvent.kind === "runConfigApplyResult") {
+        if (streamEvent.status === "applied") {
+          setEffectiveRunConfig(streamEvent.effective);
+          setLastSuccessfulRunConfig(streamEvent.effective);
+          setRunConfigStatus("idle");
+          setSystemNotices((items) => [...items, "設定変更を反映しました"]);
+          appendEventLog("notification", "RunConfig反映完了", {
+            status: streamEvent.status,
+            effective: streamEvent.effective
+          });
+          return;
+        }
+
+        const fallbackConfig =
+          lastSuccessfulRunConfig.proactivity || lastSuccessfulRunConfig.affectiveDialog
+            ? lastSuccessfulRunConfig
+            : { proactivity: false, affectiveDialog: false };
+        setEffectiveRunConfig(fallbackConfig);
+        setRunConfigStatus("idle");
+        setSystemNotices((items) => [
+          ...items,
+          `設定反映に失敗: ${streamEvent.reason ?? "unsupported"}`
+        ]);
+        appendEventLog("notification", "RunConfig反映失敗", {
+          status: streamEvent.status,
+          reason: streamEvent.reason,
+          fallback: fallbackConfig
+        });
+        return;
+      }
+
       if (streamEvent.kind === "interrupted") {
         const activeId = activeAgentMessageIdRef.current;
         if (activeId) {
@@ -267,7 +331,7 @@ export function App(): JSX.Element {
 
     window.addEventListener("mock-stream-event", handleMockStreamEvent as EventListener);
     return () => window.removeEventListener("mock-stream-event", handleMockStreamEvent as EventListener);
-  }, [appendEventLog]);
+  }, [appendEventLog, lastSuccessfulRunConfig]);
 
   const handleConnectStart = (): void => {
     dispatchConnectionEvent({ type: "CONNECT_REQUESTED" });
@@ -360,6 +424,42 @@ export function App(): JSX.Element {
   const handleEventLogsClear = (): void => {
     setEventLogs([]);
     setExpandedEventLogIds([]);
+  };
+
+  const requestRunConfigApply = (nextOptions: RunConfigOptions): void => {
+    const query = new URLSearchParams({
+      proactivity: String(nextOptions.proactivity),
+      affective_dialog: String(nextOptions.affectiveDialog)
+    }).toString();
+    setLastRunConfigQuery(query);
+    setRunConfigStatus("applying");
+    setSystemNotices((items) => [...items, "設定変更を反映中"]);
+    appendEventLog("notification", "RunConfig変更要求", {
+      proactivity: nextOptions.proactivity,
+      affective_dialog: nextOptions.affectiveDialog,
+      query
+    });
+    dispatchConnectionEvent({ type: "RECONNECT_REQUESTED" });
+  };
+
+  const handleRunConfigToggle = (key: keyof RunConfigOptions): void => {
+    setDesiredRunConfig((current) => {
+      const nextOptions: RunConfigOptions = {
+        ...current,
+        [key]: !current[key]
+      };
+      if (connectionState === "connected" || connectionState === "reconnecting") {
+        requestRunConfigApply(nextOptions);
+      } else {
+        setLastRunConfigQuery(
+          new URLSearchParams({
+            proactivity: String(nextOptions.proactivity),
+            affective_dialog: String(nextOptions.affectiveDialog)
+          }).toString()
+        );
+      }
+      return nextOptions;
+    });
   };
 
   const renderAudioMetrics = (): JSX.Element => (
@@ -463,6 +563,43 @@ export function App(): JSX.Element {
             切断
           </button>
         )}
+      </div>
+      <div className="mt-4 rounded border border-slate-200 bg-slate-50 p-3">
+        <p className="text-sm font-medium">RunConfig</p>
+        <label className="mt-2 flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={desiredRunConfig.proactivity}
+            onChange={() => handleRunConfigToggle("proactivity")}
+            disabled={runConfigStatus === "applying"}
+          />
+          Proactivity
+        </label>
+        <label className="mt-1 flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={desiredRunConfig.affectiveDialog}
+            onChange={() => handleRunConfigToggle("affectiveDialog")}
+            disabled={runConfigStatus === "applying"}
+          />
+          Affective Dialog
+        </label>
+        <p data-testid="run-config-status" className="mt-2 text-xs text-slate-600">
+          {runConfigStatus === "applying" ? "反映中" : "待機"}
+        </p>
+        <p data-testid="run-config-query" className="mt-1 text-xs text-slate-600">
+          {lastRunConfigQuery}
+        </p>
+        <p data-testid="run-config-effective" className="mt-1 text-xs text-slate-600">
+          effective: proactivity={String(effectiveRunConfig.proactivity)}, affectiveDialog=
+          {String(effectiveRunConfig.affectiveDialog)}
+        </p>
+        <p data-testid="run-config-drift" className="mt-1 text-xs text-slate-600">
+          {desiredRunConfig.proactivity === effectiveRunConfig.proactivity &&
+          desiredRunConfig.affectiveDialog === effectiveRunConfig.affectiveDialog
+            ? "一致"
+            : "不一致"}
+        </p>
       </div>
     </section>
   );
