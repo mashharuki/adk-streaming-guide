@@ -5,7 +5,7 @@ from google.adk.tools import google_search
 
 # AI Agentの定義
 agent = Agent(
-    name="workshop_agent",
+    name="my_voice_agent",
     model="gemini-live-2.5-flash-native-audio", # モデルを指定
     instruction="""
         You are a helpful AI assistant.

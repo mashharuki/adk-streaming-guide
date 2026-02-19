@@ -12,7 +12,6 @@ source venv/bin/activate
 ### 依存関係のインストール
 
 ```bash
-cd workshops/src
 pip install -e .
 ```
 
