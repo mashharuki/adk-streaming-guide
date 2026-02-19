@@ -44,6 +44,10 @@ type MockStreamEvent =
       effective: RunConfigOptions;
       reason?: string;
     }
+  | {
+      kind: "error";
+      message: string;
+    }
   | { kind: "turnComplete" }
   | { kind: "interrupted" };
 
@@ -313,6 +317,14 @@ export function App(): JSX.Element {
           reason: streamEvent.reason,
           fallback: fallbackConfig
         });
+        return;
+      }
+
+      if (streamEvent.kind === "error") {
+        dispatchConnectionEvent({ type: "CONNECTION_ERROR" });
+        setSystemNotices((items) => [...items, `WebSocketエラー: ${streamEvent.message}`]);
+        appendEventLog("notification", "WebSocketエラー", { message: streamEvent.message });
+        setReconnectScheduled(true);
         return;
       }
 
@@ -734,7 +746,13 @@ export function App(): JSX.Element {
         <p className="text-sm font-medium">システム通知</p>
         <ul data-testid="system-notices" className="mt-1 list-disc pl-5 text-sm text-slate-700">
           {systemNotices.map((notice, index) => (
-            <li key={`${notice}-${index}`}>{notice}</li>
+            <li
+              key={`${notice}-${index}`}
+              data-testid="system-notice-item"
+              className="system-notice-item rounded border-l-2 border-amber-400 bg-amber-50 px-2 py-1"
+            >
+              {notice}
+            </li>
           ))}
         </ul>
       </section>

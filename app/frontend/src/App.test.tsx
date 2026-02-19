@@ -515,4 +515,56 @@ describe("App shell", () => {
     expect(screen.getByTestId("system-notices")).toHaveTextContent("設定反映に失敗");
     vi.useRealTimers();
   });
+
+  it("records websocket error to observability log and notifies user with recovery flow", () => {
+    vi.useFakeTimers();
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "接続開始" }));
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+    expect(screen.getByTestId("connection-state")).toHaveTextContent("接続済み");
+
+    act(() => {
+      dispatchMockStreamEvent({ kind: "error", message: "socket down" });
+    });
+
+    expect(screen.getByTestId("connection-state")).toHaveTextContent("エラー");
+    expect(screen.getByTestId("system-notices")).toHaveTextContent("WebSocketエラー: socket down");
+    expect(screen.getAllByTestId("event-log-item-notification")[0]).toHaveTextContent("WebSocketエラー");
+
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
+    expect(screen.getByTestId("connection-state")).toHaveTextContent("再接続中");
+    expect(screen.getByTestId("system-notices")).toHaveTextContent("再接続を試行中");
+    vi.useRealTimers();
+  });
+
+  it("keeps system notices visually separated from conversation messages across breakpoints", () => {
+    vi.useFakeTimers();
+    const widths = [1280, 900, 375];
+
+    for (const width of widths) {
+      setViewport(width);
+      const { unmount } = render(<App />);
+
+      fireEvent.click(screen.getByRole("button", { name: "接続開始" }));
+      act(() => {
+        vi.advanceTimersByTime(500);
+      });
+      fireEvent.change(screen.getByLabelText("テキスト入力"), { target: { value: "表示分離テスト" } });
+      fireEvent.click(screen.getByRole("button", { name: "送信" }));
+
+      const noticeItems = screen.getAllByTestId("system-notice-item");
+      expect(noticeItems.length).toBeGreaterThan(0);
+      expect(screen.getByTestId("conversation-message-user")).toBeInTheDocument();
+      expect(noticeItems[0].className).toContain("system-notice-item");
+      expect(screen.getByTestId("conversation-message-user").className).not.toContain("system-notice-item");
+
+      unmount();
+    }
+    vi.useRealTimers();
+  });
 });
