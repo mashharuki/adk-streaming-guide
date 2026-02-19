@@ -39,5 +39,13 @@ cd app
 python -m uvicorn main:app --host 0.0.0.0 --port 8080
 ```
 
+### PWA の確認
+
+- `http://localhost:8080/` でアクセス
+- ブラウザ DevTools の Application タブで以下を確認
+  - `Manifest` が読める
+  - `Service Workers` に `/service-worker.js` が登録される
+  - オフライン時もシェルが表示される
+
 ## 参考文献
 - [GitHub -adk-samples](https://github.com/google/adk-samples/tree/main)

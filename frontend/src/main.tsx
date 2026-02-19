@@ -18,3 +18,11 @@ createRoot(rootElement).render(
     </AppStateProvider>
   </StrictMode>
 );
+
+if (import.meta.env.PROD && "serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/service-worker.js").catch((error: unknown) => {
+      console.error("service worker registration failed", error);
+    });
+  });
+}

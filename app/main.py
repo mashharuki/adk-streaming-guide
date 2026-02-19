@@ -43,6 +43,23 @@ runner = Runner(app_name=APP_NAME, agent=agent, session_service=session_service)
 async def root():
     return FileResponse(Path(__file__).parent / "static" / "index.html")
 
+
+@app.get("/manifest.webmanifest")
+async def manifest():
+    return FileResponse(
+        Path(__file__).parent / "static" / "manifest.webmanifest",
+        media_type="application/manifest+json",
+    )
+
+
+@app.get("/service-worker.js")
+async def service_worker():
+    return FileResponse(
+        Path(__file__).parent / "static" / "service-worker.js",
+        media_type="application/javascript",
+        headers={"Service-Worker-Allowed": "/"},
+    )
+
 # WebSocket用のAPI
 @app.websocket("/ws/{user_id}/{session_id}")
 async def websocket_endpoint(
