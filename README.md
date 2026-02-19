@@ -34,3 +34,5 @@ python -m uvicorn main:app --host 0.0.0.0 --port 8080
 
 ## 参考文献
 - [GitHub -adk-samples](https://github.com/google/adk-samples/tree/main)
+
+/prompts:kiro-spec-impl react-realtime-voice-ui 1.1

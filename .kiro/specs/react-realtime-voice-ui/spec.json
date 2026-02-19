@@ -1,0 +1,22 @@
+{
+  "feature_name": "react-realtime-voice-ui",
+  "created_at": "2026-02-19T05:27:33Z",
+  "updated_at": "2026-02-19T05:55:12Z",
+  "language": "ja",
+  "phase": "tasks-generated",
+  "approvals": {
+    "requirements": {
+      "generated": true,
+      "approved": true
+    },
+    "design": {
+      "generated": true,
+      "approved": true
+    },
+    "tasks": {
+      "generated": true,
+      "approved": true
+    }
+  },
+  "ready_for_implementation": true
+}
