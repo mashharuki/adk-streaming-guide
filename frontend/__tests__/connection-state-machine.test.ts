@@ -4,7 +4,7 @@ import {
   type ConnectionMachineEvent,
   connectionStateMachine,
   initialConnectionState
-} from "./connection-state-machine";
+} from "../src/connection/connection-state-machine";
 
 function reduce(events: ConnectionMachineEvent[]) {
   return events.reduce(connectionStateMachine, initialConnectionState);

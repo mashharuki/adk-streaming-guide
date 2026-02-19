@@ -556,6 +556,11 @@ export function App(): JSX.Element {
       {connectionState === "disconnected" && reconnectScheduled && (
         <p className="mt-2 text-sm text-amber-700">再接続予定</p>
       )}
+      {connectionState === "error" && reconnectScheduled && (
+        <p data-testid="recovery-status-banner" className="mt-2 text-sm text-amber-700">
+          自動回復を試行中
+        </p>
+      )}
       <div className="mt-3 flex flex-wrap gap-2">
         {(connectionState === "disconnected" || connectionState === "error") && (
           <button

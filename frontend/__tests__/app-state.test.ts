@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { createInitialAppState } from "./app-state";
+import { createInitialAppState } from "../src/state/app-state";
 
 describe("createInitialAppState", () => {
   it("initializes shared state for conversation, connection, notices, and event log", () => {

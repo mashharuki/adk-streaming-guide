@@ -25,7 +25,14 @@ GOOGLE_CLOUD_LOCATION=us-central1
 GOOGLE_GENAI_USE_VERTEXAI=TRUE
 ```
 
-### 音声エージェントの立ち上げ
+### フロントエンドアプリケーションのビルド
+
+```bash
+cd frontend 
+bun run build
+```
+
+### 音声エージェントの立ち上げ(バックエンド)
 
 ```bash
 cd app

@@ -1,7 +1,7 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { App } from "./App";
+import { App } from "../src/App";
 
 function setViewport(width: number): void {
   Object.defineProperty(window, "innerWidth", {
@@ -562,6 +562,99 @@ describe("App shell", () => {
       expect(screen.getByTestId("conversation-message-user")).toBeInTheDocument();
       expect(noticeItems[0].className).toContain("system-notice-item");
       expect(screen.getByTestId("conversation-message-user").className).not.toContain("system-notice-item");
+
+      unmount();
+    }
+    vi.useRealTimers();
+  });
+
+  it("verifies integrated major flow including recovery banner, interruption, runconfig fallback, and event logs", async () => {
+    Object.defineProperty(navigator, "mediaDevices", {
+      configurable: true,
+      value: {
+        getUserMedia: vi.fn().mockResolvedValue({
+          getTracks: () => [{ stop: vi.fn() }]
+        })
+      }
+    });
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "接続開始" }));
+    await waitFor(() => {
+      expect(screen.getByTestId("connection-state")).toHaveTextContent("接続済み");
+    });
+
+    fireEvent.change(screen.getByLabelText("テキスト入力"), { target: { value: "統合フロー" } });
+    fireEvent.click(screen.getByRole("button", { name: "送信" }));
+    expect(screen.getByTestId("conversation-message-user")).toHaveTextContent("統合フロー");
+
+    fireEvent.click(screen.getByRole("button", { name: "音声開始" }));
+    act(() => {
+      dispatchMockAudioChunk({ size: 320 });
+      dispatchMockStreamEvent({ kind: "audioOutput", chunkSize: 640 });
+      dispatchMockStreamEvent({ kind: "interrupted" });
+    });
+    expect(screen.getByTestId("audio-playback-state")).toHaveTextContent("中断");
+
+    fireEvent.click(screen.getByRole("button", { name: "画像送信" }));
+    const dialog = await screen.findByRole("dialog", { name: "camera-preview" });
+    fireEvent.click(within(dialog).getByRole("button", { name: "画像を送信" }));
+    expect(screen.getByTestId("image-upstream-count")).toHaveTextContent("1");
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "Affective Dialog" }));
+    act(() => {
+      dispatchMockStreamEvent({
+        kind: "runConfigApplyResult",
+        status: "rejected",
+        effective: { proactivity: false, affectiveDialog: false },
+        reason: "unsupported"
+      });
+    });
+    expect(screen.getByTestId("run-config-drift")).toHaveTextContent("不一致");
+
+    act(() => {
+      dispatchMockStreamEvent({ kind: "error", message: "temporary disconnect" });
+    });
+    expect(screen.getByText("自動回復を試行中")).toBeInTheDocument();
+    expect(screen.getByTestId("system-notices")).toHaveTextContent("WebSocketエラー");
+
+    await waitFor(
+      () => {
+        expect(screen.getByTestId("connection-state")).toHaveTextContent("再接続中");
+      },
+      { timeout: 2500 }
+    );
+    expect(screen.getAllByTestId("event-log-item").length).toBeGreaterThan(0);
+  });
+
+  it("covers acceptance regression for desktop and mobile on partial response completion and notice separation", () => {
+    vi.useFakeTimers();
+    const widths = [1280, 375];
+
+    for (const width of widths) {
+      setViewport(width);
+      const { unmount } = render(<App />);
+
+      fireEvent.click(screen.getByRole("button", { name: "接続開始" }));
+      act(() => {
+        vi.advanceTimersByTime(500);
+      });
+
+      act(() => {
+        dispatchMockStreamEvent({ kind: "text", role: "agent", text: "途中", partial: true });
+      });
+      expect(screen.getByTestId("conversation-message-agent")).toHaveTextContent("partial");
+      act(() => {
+        dispatchMockStreamEvent({ kind: "turnComplete" });
+      });
+      expect(screen.getByTestId("conversation-message-agent")).toHaveTextContent("complete");
+
+      const noticeItems = screen.getAllByTestId("system-notice-item");
+      expect(noticeItems.length).toBeGreaterThan(0);
+      expect(screen.getByRole("button", { name: "送信" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "音声開始" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "画像送信" })).toBeInTheDocument();
 
       unmount();
     }
