@@ -39,6 +39,34 @@ cd app
 python -m uvicorn main:app --host 0.0.0.0 --port 8080
 ```
 
+### Dockerでバックエンドを起動
+
+Dockerで起動する場合は以下のコマンドを実行する
+
+```bash
+cd app
+# Dockerコンテナイメージのビルド
+docker build -t voice-agent-backend .
+source .env
+# コンテナ起動
+docker run --rm -p 8080:8080 voice-agent-backend \
+  -e GOOGLE_APPLICATION_CREDENTIALS=/var/secrets/google/key.json \
+  -v /path/to/service-account.json:/var/secrets/google/key.json:ro \
+  voice-agent-backend
+```
+
+### CloudRunにデプロイ
+
+```bash
+./app/deploy.sh
+```
+
+### CloudRunからデストロイ
+
+```bash
+FORCE=true DELETE_SA=true ./app/cleanup.sh
+```
+
 ### PWA の確認
 
 - `http://localhost:8080/` でアクセス

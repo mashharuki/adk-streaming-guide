@@ -51,6 +51,28 @@ type MockStreamEvent =
   | { kind: "turnComplete" }
   | { kind: "interrupted" };
 
+type AdkEventPart = {
+  text?: string;
+  inlineData?: {
+    mimeType?: string;
+    data?: string;
+  };
+  inline_data?: {
+    mime_type?: string;
+    data?: string;
+  };
+};
+
+type AdkEventPayload = {
+  author?: string;
+  turnComplete?: boolean;
+  interrupted?: boolean;
+  error?: string | { message?: string };
+  content?: {
+    parts?: AdkEventPart[];
+  };
+};
+
 function detectLayoutMode(width: number): LayoutMode {
   if (width <= 767) {
     return "mobile";
@@ -70,6 +92,45 @@ function getInitialLayoutMode(): LayoutMode {
 
 function createMessageId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+function isJsdomRuntime(): boolean {
+  return typeof navigator !== "undefined" && /jsdom/i.test(navigator.userAgent);
+}
+
+function buildWebSocketUrl(userId: string, sessionId: string): string {
+  const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+  return `${protocol}//${window.location.host}/ws/${userId}/${sessionId}`;
+}
+
+function decodeBase64ToArrayBuffer(base64: string): ArrayBuffer {
+  const binary = window.atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes.buffer;
+}
+
+function parsePcmRate(mimeType: string | undefined, fallback = 24000): number {
+  if (!mimeType) {
+    return fallback;
+  }
+  const match = mimeType.match(/rate=(\d+)/);
+  if (!match) {
+    return fallback;
+  }
+  const rate = Number(match[1]);
+  return Number.isFinite(rate) ? rate : fallback;
+}
+
+function floatTo16BitPCM(float32Array: Float32Array): Int16Array {
+  const pcm = new Int16Array(float32Array.length);
+  for (let i = 0; i < float32Array.length; i += 1) {
+    const sample = Math.max(-1, Math.min(1, float32Array[i]));
+    pcm[i] = sample < 0 ? sample * 0x8000 : sample * 0x7fff;
+  }
+  return pcm;
 }
 
 export function App(): JSX.Element {
@@ -106,10 +167,23 @@ export function App(): JSX.Element {
   const [lastRunConfigQuery, setLastRunConfigQuery] = useState("proactivity=false&affective_dialog=false");
   const [isCameraModalOpen, setIsCameraModalOpen] = useState(false);
   const [cameraActive, setCameraActive] = useState(false);
+  const liveModeEnabled =
+    typeof window !== "undefined" && typeof WebSocket !== "undefined" && !isJsdomRuntime();
   const previousConnectionState = useRef(initialConnectionState);
   const conversationLogRef = useRef<HTMLUListElement>(null);
   const activeAgentMessageIdRef = useRef<string | null>(null);
   const cameraStreamRef = useRef<MediaStream | null>(null);
+  const websocketRef = useRef<WebSocket | null>(null);
+  const isManualSocketCloseRef = useRef(false);
+  const userIdRef = useRef("demo-user");
+  const sessionIdRef = useRef(`demo-session-${createMessageId()}`);
+  const isVoiceInputActiveRef = useRef(false);
+  const micStreamRef = useRef<MediaStream | null>(null);
+  const audioInputContextRef = useRef<AudioContext | null>(null);
+  const audioInputProcessorRef = useRef<ScriptProcessorNode | null>(null);
+  const audioInputSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const audioOutputContextRef = useRef<AudioContext | null>(null);
+  const audioOutputNextPlayAtRef = useRef(0);
 
   const appendEventLog = useCallback(
     (category: EventLogCategory, summary: string, detail: unknown, kind: EventLogKind = "standard"): void => {
@@ -129,6 +203,223 @@ export function App(): JSX.Element {
   const toggleEventLogExpanded = useCallback((id: string): void => {
     setExpandedEventLogIds((ids) => (ids.includes(id) ? ids.filter((item) => item !== id) : [...ids, id]));
   }, []);
+
+  const emitMockStreamEvent = useCallback((event: MockStreamEvent): void => {
+    window.dispatchEvent(new CustomEvent("mock-stream-event", { detail: event }));
+  }, []);
+
+  const stopAudioInputCapture = useCallback((): void => {
+    if (audioInputProcessorRef.current) {
+      audioInputProcessorRef.current.disconnect();
+      audioInputProcessorRef.current.onaudioprocess = null;
+      audioInputProcessorRef.current = null;
+    }
+    if (audioInputSourceRef.current) {
+      audioInputSourceRef.current.disconnect();
+      audioInputSourceRef.current = null;
+    }
+    if (audioInputContextRef.current) {
+      void audioInputContextRef.current.close();
+      audioInputContextRef.current = null;
+    }
+    if (micStreamRef.current) {
+      micStreamRef.current.getTracks().forEach((track) => track.stop());
+      micStreamRef.current = null;
+    }
+  }, []);
+
+  const resetAudioOutputPipeline = useCallback((): void => {
+    if (audioOutputContextRef.current) {
+      void audioOutputContextRef.current.close();
+      audioOutputContextRef.current = null;
+    }
+    audioOutputNextPlayAtRef.current = 0;
+  }, []);
+
+  const playPcmAudioChunk = useCallback(
+    (base64Data: string, mimeType?: string): void => {
+      try {
+        const sampleRate = parsePcmRate(mimeType, 24000);
+        if (!audioOutputContextRef.current || audioOutputContextRef.current.sampleRate !== sampleRate) {
+          resetAudioOutputPipeline();
+          audioOutputContextRef.current = new AudioContext({ sampleRate });
+        }
+
+        const audioContext = audioOutputContextRef.current;
+        if (!audioContext) {
+          return;
+        }
+
+        const rawBuffer = decodeBase64ToArrayBuffer(base64Data);
+        const view = new DataView(rawBuffer);
+        const sampleCount = Math.floor(view.byteLength / 2);
+        const floatSamples = new Float32Array(sampleCount);
+        for (let i = 0; i < sampleCount; i += 1) {
+          const sample = view.getInt16(i * 2, true);
+          floatSamples[i] = sample / 0x8000;
+        }
+
+        const audioBuffer = audioContext.createBuffer(1, sampleCount, sampleRate);
+        audioBuffer.copyToChannel(floatSamples, 0);
+        const source = audioContext.createBufferSource();
+        source.buffer = audioBuffer;
+        source.connect(audioContext.destination);
+
+        const startAt = Math.max(audioContext.currentTime, audioOutputNextPlayAtRef.current);
+        source.start(startAt);
+        audioOutputNextPlayAtRef.current = startAt + audioBuffer.duration;
+      } catch (error) {
+        appendEventLog("notification", "音声再生処理失敗", { message: String(error) });
+      }
+    },
+    [appendEventLog, resetAudioOutputPipeline]
+  );
+
+  const handleAdkMessage = useCallback(
+    (rawText: string): void => {
+      let adkEvent: AdkEventPayload;
+      try {
+        adkEvent = JSON.parse(rawText) as AdkEventPayload;
+      } catch {
+        emitMockStreamEvent({
+          kind: "error",
+          message: "invalid server payload"
+        });
+        return;
+      }
+
+      if (adkEvent.error) {
+        const message =
+          typeof adkEvent.error === "string" ? adkEvent.error : adkEvent.error.message ?? "unknown websocket error";
+        emitMockStreamEvent({ kind: "error", message });
+      }
+
+      if (adkEvent.interrupted === true) {
+        resetAudioOutputPipeline();
+        emitMockStreamEvent({ kind: "interrupted" });
+      }
+
+      if (adkEvent.content?.parts) {
+        for (const part of adkEvent.content.parts) {
+          const inlineData = part.inlineData ?? {
+            mimeType: part.inline_data?.mime_type,
+            data: part.inline_data?.data
+          };
+          if (part.text) {
+            emitMockStreamEvent({
+              kind: "text",
+              role: adkEvent.author === "user" ? "user" : "agent",
+              text: part.text,
+              partial: adkEvent.turnComplete !== true
+            });
+          }
+          if (inlineData.mimeType?.startsWith("audio/pcm") && inlineData.data) {
+            playPcmAudioChunk(inlineData.data, inlineData.mimeType);
+            emitMockStreamEvent({
+              kind: "audioOutput",
+              chunkSize: inlineData.data.length
+            });
+          }
+        }
+      }
+
+      if (adkEvent.turnComplete === true) {
+        emitMockStreamEvent({ kind: "turnComplete" });
+      }
+    },
+    [emitMockStreamEvent, playPcmAudioChunk, resetAudioOutputPipeline]
+  );
+
+  const openWebSocketConnection = useCallback((): void => {
+      if (!liveModeEnabled) {
+        return;
+      }
+      if (websocketRef.current && websocketRef.current.readyState <= WebSocket.OPEN) {
+        return;
+      }
+
+      isManualSocketCloseRef.current = false;
+      const ws = new WebSocket(buildWebSocketUrl(userIdRef.current, sessionIdRef.current));
+      ws.binaryType = "arraybuffer";
+      websocketRef.current = ws;
+
+      ws.onopen = () => {
+        dispatchConnectionEvent({ type: "CONNECTED" });
+      };
+
+      ws.onmessage = (event: MessageEvent<string>) => {
+        if (typeof event.data === "string") {
+          handleAdkMessage(event.data);
+        }
+      };
+
+      ws.onerror = () => {
+        emitMockStreamEvent({ kind: "error", message: "websocket transport error" });
+      };
+
+      ws.onclose = () => {
+        websocketRef.current = null;
+        stopAudioInputCapture();
+        if (isManualSocketCloseRef.current) {
+          return;
+        }
+        dispatchConnectionEvent({ type: "CONNECTION_ERROR" });
+        setReconnectScheduled(true);
+      };
+    },
+    [emitMockStreamEvent, handleAdkMessage, liveModeEnabled, stopAudioInputCapture]
+  );
+
+  const closeWebSocketConnection = useCallback((): void => {
+    if (!websocketRef.current) {
+      return;
+    }
+    isManualSocketCloseRef.current = true;
+    websocketRef.current.close();
+    websocketRef.current = null;
+  }, []);
+
+  const startAudioInputCapture = useCallback(async (): Promise<void> => {
+    if (!liveModeEnabled) {
+      return;
+    }
+    if (!websocketRef.current || websocketRef.current.readyState !== WebSocket.OPEN) {
+      throw new Error("WebSocket未接続");
+    }
+
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1 } });
+    micStreamRef.current = stream;
+
+    const audioContext = new AudioContext({ sampleRate: 16000 });
+    audioInputContextRef.current = audioContext;
+    const source = audioContext.createMediaStreamSource(stream);
+    audioInputSourceRef.current = source;
+    const processor = audioContext.createScriptProcessor(2048, 1, 1);
+    audioInputProcessorRef.current = processor;
+    const muteGain = audioContext.createGain();
+    muteGain.gain.value = 0;
+
+    processor.onaudioprocess = (event: AudioProcessingEvent) => {
+      if (!isVoiceInputActiveRef.current) {
+        return;
+      }
+      if (!websocketRef.current || websocketRef.current.readyState !== WebSocket.OPEN) {
+        return;
+      }
+      const channel = event.inputBuffer.getChannelData(0);
+      const pcm = floatTo16BitPCM(channel);
+      websocketRef.current.send(pcm.buffer);
+      window.dispatchEvent(new CustomEvent("mock-audio-chunk", { detail: { size: pcm.byteLength } }));
+    };
+
+    source.connect(processor);
+    processor.connect(muteGain);
+    muteGain.connect(audioContext.destination);
+  }, [liveModeEnabled]);
+
+  useEffect(() => {
+    isVoiceInputActiveRef.current = isVoiceInputActive;
+  }, [isVoiceInputActive]);
 
   useEffect(() => {
     const handleResize = (): void => {
@@ -156,10 +447,16 @@ export function App(): JSX.Element {
       if (stream) {
         stream.getTracks().forEach((track) => track.stop());
       }
+      closeWebSocketConnection();
+      stopAudioInputCapture();
+      resetAudioOutputPipeline();
     };
-  }, []);
+  }, [closeWebSocketConnection, resetAudioOutputPipeline, stopAudioInputCapture]);
 
   useEffect(() => {
+    if (liveModeEnabled) {
+      return;
+    }
     if (connectionState !== "connecting" && connectionState !== "reconnecting") {
       return;
     }
@@ -169,7 +466,7 @@ export function App(): JSX.Element {
     }, 400);
 
     return () => window.clearTimeout(timeoutId);
-  }, [connectionState]);
+  }, [connectionState, liveModeEnabled]);
 
   useEffect(() => {
     const prev = previousConnectionState.current;
@@ -204,9 +501,10 @@ export function App(): JSX.Element {
       setSystemNotices((items) => [...items, "再接続を試行中"]);
       appendEventLog("notification", "再接続試行", { scheduled: true });
       setReconnectScheduled(false);
+      openWebSocketConnection();
     }, 1000);
     return () => window.clearTimeout(timeoutId);
-  }, [appendEventLog, reconnectScheduled]);
+  }, [appendEventLog, openWebSocketConnection, reconnectScheduled]);
 
   useEffect(() => {
     const conversationLog = conversationLogRef.current;
@@ -348,9 +646,13 @@ export function App(): JSX.Element {
   const handleConnectStart = (): void => {
     dispatchConnectionEvent({ type: "CONNECT_REQUESTED" });
     appendEventLog("notification", "接続開始要求", { source: "ui" });
+    openWebSocketConnection();
   };
 
   const handleDisconnect = (): void => {
+    closeWebSocketConnection();
+    stopAudioInputCapture();
+    setIsVoiceInputActive(false);
     dispatchConnectionEvent({ type: "DISCONNECTED" });
     setReconnectScheduled(true);
     setSystemNotices((items) => [...items, "切断"]);
@@ -373,6 +675,14 @@ export function App(): JSX.Element {
       }
     ]);
     appendEventLog("conversation", "テキスト送信", { text: trimmedValue });
+    if (websocketRef.current && websocketRef.current.readyState === WebSocket.OPEN) {
+      websocketRef.current.send(
+        JSON.stringify({
+          type: "text",
+          text: trimmedValue
+        })
+      );
+    }
     setTextInputValue("");
   };
 
@@ -382,7 +692,20 @@ export function App(): JSX.Element {
   };
 
   const handleVoiceInputToggle = (): void => {
-    setIsVoiceInputActive((active) => !active);
+    if (isVoiceInputActiveRef.current) {
+      setIsVoiceInputActive(false);
+      stopAudioInputCapture();
+      return;
+    }
+
+    setIsVoiceInputActive(true);
+    void startAudioInputCapture().catch((error: unknown) => {
+      setIsVoiceInputActive(false);
+      stopAudioInputCapture();
+      const message = error instanceof Error ? error.message : "音声入力開始に失敗";
+      setSystemNotices((items) => [...items, `音声入力に失敗: ${message}`]);
+      appendEventLog("notification", "音声入力開始失敗", { message });
+    });
   };
 
   const handleCameraClose = (): void => {
@@ -426,6 +749,16 @@ export function App(): JSX.Element {
     ]);
     setImageUpstreamCount((count) => count + 1);
     appendEventLog("conversation", "画像送信", { placeholder: true });
+    if (websocketRef.current && websocketRef.current.readyState === WebSocket.OPEN) {
+      websocketRef.current.send(
+        JSON.stringify({
+          type: "image",
+          mimeType: "image/png",
+          // 1x1 transparent PNG
+          data: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9mZ1tcQAAAAASUVORK5CYII="
+        })
+      );
+    }
     handleCameraClose();
   };
 
@@ -452,6 +785,10 @@ export function App(): JSX.Element {
       query
     });
     dispatchConnectionEvent({ type: "RECONNECT_REQUESTED" });
+    if (liveModeEnabled) {
+      closeWebSocketConnection();
+      setReconnectScheduled(true);
+    }
   };
 
   const handleRunConfigToggle = (key: keyof RunConfigOptions): void => {

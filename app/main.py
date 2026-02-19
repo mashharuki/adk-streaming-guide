@@ -137,16 +137,30 @@ async def websocket_endpoint(
     async def downstream_task() -> None:
         """Receives Events from run_live() and sends to WebSocket."""
         print("[DOWNSTREAM] Starting run_live()")
-
-        async for event in runner.run_live(
-            user_id=user_id,
-            session_id=session_id,
-            live_request_queue=live_request_queue,
-            run_config=run_config,
-        ):
-            event_json = event.model_dump_json(exclude_none=True, by_alias=True)
-            print(f"[DOWNSTREAM] Event: {event_json[:100]}...")
-            await websocket.send_text(event_json)
+        try:
+            async for event in runner.run_live(
+                user_id=user_id,
+                session_id=session_id,
+                live_request_queue=live_request_queue,
+                run_config=run_config,
+            ):
+                event_json = event.model_dump_json(exclude_none=True, by_alias=True)
+                print(f"[DOWNSTREAM] Event: {event_json[:100]}...")
+                await websocket.send_text(event_json)
+        except Exception as error:
+            # Surface backend failures to the client and avoid noisy ASGI tracebacks.
+            error_payload = json.dumps(
+                {
+                    "error": {
+                        "message": str(error),
+                    }
+                }
+            )
+            print(f"[DOWNSTREAM] Fatal error: {error}")
+            try:
+                await websocket.send_text(error_payload)
+            except Exception:
+                pass
 
         print("[DOWNSTREAM] run_live() completed")
 
@@ -154,6 +168,8 @@ async def websocket_endpoint(
         await asyncio.gather(upstream_task(), downstream_task())
     except (WebSocketDisconnect, RuntimeError):
         print("Client disconnected")
+    except Exception as error:
+        print(f"Session failed: {error}")
     finally:
         live_request_queue.close()
         print("Session terminated")
