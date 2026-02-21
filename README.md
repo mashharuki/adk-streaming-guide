@@ -1,5 +1,58 @@
 # リアル音声AIエージェントのデモアプリ
 
+## プロジェクトの概要
+
+Google ADKのBidiストリーミングを利用した、音声・テキスト・画像に対応するリアルタイムAIデモアプリです。FastAPIのWebSocket経由で双方向通信し、フロントエンドは会話ログ・イベントログ・接続状態などの観測性を提供します。
+
+## 機能一覧表
+
+| 機能 | 概要 |
+| --- | --- |
+| 音声対話 | マイク入力と音声出力の双方向ストリーミング |
+| テキスト対話 | テキスト入力とリアルタイム応答表示 |
+| 画像入力 | カメラキャプチャ画像をアップロード |
+| 画像生成 | 指定プロンプトで画像生成し会話欄に表示 |
+| 文字起こし | 音声入力/出力のトランスクリプション表示 |
+| 接続管理 | 接続/再接続/切断の状態表示 |
+| イベント観測 | 通信イベントを時系列で確認 |
+| PWA対応 | Manifest/Service Worker/オフライン表示 |
+
+## フォルダ構成
+
+```
+adk-streaming-guide/
+├── app/
+│   ├── main.py
+│   ├── my_agent/
+│   │   └── agent.py
+│   └── static/
+│       ├── index.html
+│       ├── assets/
+│       └── service-worker.js
+├── frontend/
+│   ├── src/
+│   └── __tests__/
+├── docs/
+└── README.md
+```
+
+## 技術スタック
+
+| カテゴリ | 技術 | 概要 | バージョン |
+| --- | --- | --- | --- |
+| Backend | Python | 実行環境 | >=3.10 |
+| Backend | FastAPI | WebSocket対応APIサーバー | >=0.115.0 |
+| Backend | Google ADK | エージェント/ストリーミング基盤 | >=1.22.1 |
+| Backend | Uvicorn | ASGIサーバー | >=0.32.0 |
+| Backend | python-dotenv | 環境変数読込 | >=1.0.0 |
+| Backend | websockets | WebSocketユーティリティ | >=13.0 |
+| Frontend | React | UIライブラリ | 19.0.0 |
+| Frontend | Vite | ビルド/開発サーバー | 6.0.3 |
+| Frontend | TypeScript | 型付きJavaScript | 5.7.2 |
+| Frontend | Tailwind CSS | スタイリング | 4.0.0 |
+| Frontend | Vitest | テストランナー | 2.1.8 |
+| Frontend | Testing Library | UIテスト支援 | 16.1.0 |
+
 ## 動かし方
 
 ### venvのセットアップ
