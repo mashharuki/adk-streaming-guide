@@ -1,4 +1,4 @@
-import { type FormEvent, useCallback, useEffect, useReducer, useRef, useState } from "react";
+import { type FormEvent, type JSX, useCallback, useEffect, useReducer, useRef, useState } from "react";
 
 import {
   connectionStateMachine,
@@ -12,6 +12,8 @@ type ConversationMessage = {
   role: "user" | "agent" | "system";
   content: string;
   status: "partial" | "complete" | "interrupted";
+  imageData?: string;
+  imageMimeType?: string;
 };
 type EventLogCategory = "notification" | "conversation";
 type EventLogKind = "standard" | "audio";
@@ -33,6 +35,12 @@ type MockStreamEvent =
       role: "user" | "agent";
       text: string;
       partial: boolean;
+    }
+  | {
+      kind: "imageOutput";
+      role: "user" | "agent";
+      data: string;
+      mimeType: string;
     }
   | {
       kind: "audioOutput";
@@ -328,6 +336,14 @@ export function App(): JSX.Element {
               chunkSize: inlineData.data.length
             });
           }
+          if (inlineData.mimeType?.startsWith("image/") && inlineData.data) {
+            emitMockStreamEvent({
+              kind: "imageOutput",
+              role: adkEvent.author === "user" ? "user" : "agent",
+              data: inlineData.data,
+              mimeType: inlineData.mimeType
+            });
+          }
         }
       }
 
@@ -590,6 +606,23 @@ export function App(): JSX.Element {
         setAudioDownstreamChunkCount((count) => count + 1);
         setAudioPlaybackState("playing");
         appendEventLog("conversation", "音声出力受信", { chunkSize: streamEvent.chunkSize }, "audio");
+        return;
+      }
+
+      if (streamEvent.kind === "imageOutput") {
+        const newMessageId = createMessageId();
+        setConversationMessages((items) => [
+          ...items,
+          {
+            id: newMessageId,
+            role: streamEvent.role,
+            content: "画像を生成しました",
+            status: "complete",
+            imageData: streamEvent.data,
+            imageMimeType: streamEvent.mimeType
+          }
+        ]);
+        appendEventLog("conversation", "画像生成を受信", { mimeType: streamEvent.mimeType });
         return;
       }
 
@@ -1007,7 +1040,14 @@ export function App(): JSX.Element {
                   : "bg-[#1A2B27] text-[#DDF6EE]"
             }`}
           >
-            <p>{message.content}</p>
+            {message.content && <p>{message.content}</p>}
+            {message.imageData && (
+              <img
+                src={`data:${message.imageMimeType ?? "image/png"};base64,${message.imageData}`}
+                alt="生成画像"
+                className="mt-2 max-w-full rounded"
+              />
+            )}
             <p className="mt-1 text-xs text-slate-400">{message.status}</p>
           </li>
         ))}
@@ -1144,7 +1184,7 @@ export function App(): JSX.Element {
             value={textInputValue}
             onChange={(event) => setTextInputValue(event.target.value)}
             className="min-w-[200px] flex-1 rounded-xl border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500"
-            placeholder="メッセージを入力"
+            placeholder="メッセージを入力（例: 画像生成: 夕焼け）"
           />
           <button type="submit" className="rounded-xl bg-[#FF7A3D] px-4 py-2 text-sm font-semibold text-slate-950">
             送信

@@ -5,6 +5,7 @@ import base64
 import json
 import warnings
 from pathlib import Path
+from typing import Any, Optional
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
@@ -23,7 +24,7 @@ warnings.filterwarnings("ignore", category=UserWarning, module="pydantic")
 # 環境変数の読み込み
 load_dotenv(Path(__file__).parent / ".env")
 
-from my_agent.agent import agent  # noqa: E402
+from my_agent.agent import image_agent, voice_agent  # noqa: E402
 
 APP_NAME = "bidi-workshop"
 
@@ -35,8 +36,49 @@ app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
 # メモリセッション用の機能を設定
 session_service = InMemorySessionService()
+IMAGE_PROMPT_PREFIXES = ("画像生成:", "画像生成：", "画像:", "画像：", "/image ", "image:")
+
 # Runnerインスタンスの初期化
-runner = Runner(app_name=APP_NAME, agent=agent, session_service=session_service)
+runner = Runner(app_name=APP_NAME, agent=voice_agent, session_service=session_service)
+
+
+def extract_image_prompt(text: str) -> Optional[str]:
+    stripped = text.strip()
+    if not stripped:
+        return None
+    folded = stripped.casefold()
+    for prefix in IMAGE_PROMPT_PREFIXES:
+        if folded.startswith(prefix.casefold()):
+            candidate = stripped[len(prefix):].strip()
+            return candidate if candidate else None
+    return None
+
+
+async def build_image_event(prompt: str) -> dict[str, Any]:
+    base64_data, mime_type = await asyncio.to_thread(image_agent.generate_image, prompt)
+    return {
+        "author": "image_agent",
+        "turnComplete": True,
+        "content": {
+            "parts": [
+                {"text": "画像を生成しました"},
+                {"inlineData": {"mimeType": mime_type, "data": base64_data}},
+            ]
+        },
+    }
+
+
+def build_image_error_event(message: str) -> dict[str, Any]:
+    return {
+        "author": "image_agent",
+        "turnComplete": True,
+        "error": {"message": message},
+        "content": {
+            "parts": [
+                {"text": f"画像生成に失敗しました: {message}"},
+            ]
+        },
+    }
 
 # デフォルトのエンドポイント
 @app.get("/")
@@ -100,6 +142,17 @@ async def websocket_endpoint(
                 if json_message.get("type") == "text":
                     user_text = json_message["text"]
                     print(f"[UPSTREAM] Text: {user_text}")
+
+                    image_prompt = extract_image_prompt(user_text)
+                    if image_prompt:
+                        try:
+                            image_event = await build_image_event(image_prompt)
+                            await websocket.send_text(json.dumps(image_event))
+                        except Exception as error:
+                            error_message = str(error) or "unknown error"
+                            error_event = build_image_error_event(error_message)
+                            await websocket.send_text(json.dumps(error_event))
+                        continue
 
                     content = types.Content(
                         parts=[types.Part(text=user_text)]

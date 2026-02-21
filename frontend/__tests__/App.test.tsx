@@ -190,6 +190,25 @@ describe("App shell", () => {
     expect(screen.getByTestId("conversation-message-agent")).toHaveTextContent("interrupted");
   });
 
+  it("renders generated image output as an agent message", () => {
+    render(<App />);
+
+    act(() => {
+      dispatchMockStreamEvent({
+        kind: "imageOutput",
+        role: "agent",
+        data: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9mZ1tcQAAAAASUVORK5CYII=",
+        mimeType: "image/png"
+      });
+    });
+
+    const image = screen.getByRole("img", { name: "生成画像" });
+    expect(image).toHaveAttribute(
+      "src",
+      "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9mZ1tcQAAAAASUVORK5CYII="
+    );
+  });
+
   it("toggles voice input active state between start and stop actions", () => {
     render(<App />);
 
