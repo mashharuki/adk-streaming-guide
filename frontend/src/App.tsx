@@ -68,6 +68,12 @@ type AdkEventPayload = {
   turnComplete?: boolean;
   interrupted?: boolean;
   error?: string | { message?: string };
+  outputTranscription?: {
+    text?: string;
+  };
+  output_transcription?: {
+    text?: string;
+  };
   content?: {
     parts?: AdkEventPart[];
   };
@@ -299,6 +305,7 @@ export function App(): JSX.Element {
         emitMockStreamEvent({ kind: "interrupted" });
       }
 
+      let hasTextParts = false;
       if (adkEvent.content?.parts) {
         for (const part of adkEvent.content.parts) {
           const inlineData = part.inlineData ?? {
@@ -306,6 +313,7 @@ export function App(): JSX.Element {
             data: part.inline_data?.data
           };
           if (part.text) {
+            hasTextParts = true;
             emitMockStreamEvent({
               kind: "text",
               role: adkEvent.author === "user" ? "user" : "agent",
@@ -321,6 +329,17 @@ export function App(): JSX.Element {
             });
           }
         }
+      }
+
+      const transcriptionText =
+        adkEvent.outputTranscription?.text ?? adkEvent.output_transcription?.text;
+      if (!hasTextParts && transcriptionText?.trim()) {
+        emitMockStreamEvent({
+          kind: "text",
+          role: "agent",
+          text: transcriptionText,
+          partial: adkEvent.turnComplete !== true
+        });
       }
 
       if (adkEvent.turnComplete === true) {
