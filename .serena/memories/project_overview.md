@@ -1,13 +1,14 @@
-# Project Overview (Current)
+# Project Overview (Updated)
 - Repository: `adk-streaming-guide`
 - Package name: `voice-sample-agent` (`pyproject.toml`)
-- Purpose: Google ADK を使ったリアルタイム双方向ストリーミング（音声/テキスト/画像）デモ実装と、日本語ワークショップ資料の管理。
-- Primary stack: Python 3.10+, FastAPI, WebSocket, Google ADK (`Runner`, `RunConfig`, `LiveRequestQueue`), Gemini Live model.
+- Purpose: Google ADK を使ったリアルタイム双方向ストリーミング（音声/テキスト/画像）デモと、日本語ワークショップ資料の管理。
+- Primary stack: Python 3.10+, FastAPI, WebSocket, Google ADK (`Runner`, `RunConfig`, `LiveRequestQueue`), Gemini Live model, React + Vite + Tailwind.
 
 ## Current Structure
-- `app/main.py`: FastAPI アプリ本体。`/` で `index.html` を返し、`/ws/{user_id}/{session_id}` で BIDI ストリーミングを処理。
-- `app/my_agent/agent.py`: `Agent` 定義（`gemini-live-2.5-flash-native-audio` + `google_search` ツール）。
-- `app/static/`: フロントエンド（`index.html`, `css/style.css`, `js/*.js`）。
+- `app/main.py`: FastAPI アプリ本体。`/` で `static/index.html` を返し、`/ws/{user_id}/{session_id}` で BIDI ストリーミングを処理。PWA 用の `manifest.webmanifest` と `service-worker.js` も提供。
+- `app/my_agent/agent.py`: `Agent` 定義（モデル/ツール/インストラクションを集約）。
+- `app/static/`: フロントエンドのビルド成果物と PWA アセット（`index.html`, `assets/*`, `manifest.webmanifest`, `service-worker.js`）。
+- `frontend/`: React + Vite の UI 実装とテスト（`src`, `__tests__`, `vite.config.ts`）。
 - `app/.env.template`: 環境変数テンプレート。
 - `docs/workshop_ja.md`: 日本語ワークショップ本体ドキュメント。
 - `.github/workflows/`: `adk-version-monitor.yml`, `claude-code-reviewer.yml`。

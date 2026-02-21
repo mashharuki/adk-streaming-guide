@@ -1,13 +1,17 @@
-# Task Completion Checklist (Current)
+# Task Completion Checklist (Updated)
 - 変更対象の影響範囲を確認:
-  - `app/main.py` 変更時: WebSocket I/O、run_live loop、終了処理
+  - `app/main.py` 変更時: WebSocket I/O、run_live loop、終了処理、PWA ハンドラ
   - `app/my_agent/agent.py` 変更時: model/tools/instruction の整合性
-  - `app/static/*` 変更時: サーバー側 message handling との互換性
+  - `frontend/*` 変更時: WebSocket schema と `vite.config.ts` の配信パス
+  - `app/static/*` 変更時: フロントの build 出力との整合性
 - 必要な動作確認:
   - `source venv/bin/activate`
   - `pip install -e .`（依存変更時）
   - `cd app && python -m uvicorn main:app --host 0.0.0.0 --port 8080`
-  - ブラウザで `/` と WebSocket 接続の基本疎通を確認
+  - ブラウザで `/`、`/manifest.webmanifest`、`/service-worker.js` を確認
+- フロント変更時:
+  - `cd frontend && bun run build`（`app/static/` を更新）
+  - `cd frontend && bun run test`（必要時）
 - 品質確認:
   - 必要に応じて `black app && isort app && flake8 app`
   - `git diff` で不要変更や機密情報混入（特に `app/.env`）がないことを確認

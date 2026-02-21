@@ -1,4 +1,4 @@
-# Code Style and Conventions (Current)
+# Code Style and Conventions (Updated)
 ## Python / FastAPI
 - 非同期中心 (`async def`, `asyncio.gather`) で upstream/downstream を明確に分離する。
 - ADK BIDI の責務分離を維持する:
@@ -12,9 +12,15 @@
 - `app/my_agent/agent.py` にモデル名、instructions、tools を集約。
 - モデル変更時は音声入出力（native audio対応）との整合性を確認する。
 
-## Frontend Assets
-- `app/static/js/` は機能別分割（録音、再生、processor、app本体）。
-- WebSocket message schema（`type: text|image` と binary audio）をサーバー側実装と同期させる。
+## Frontend (React + Vite)
+- `frontend/` は React + TypeScript の関数コンポーネント中心。
+- Vite build の出力先は `app/static/`（`vite.config.ts` の `outDir`）。
+- `base` は build 時に `/static/` を前提としているため、静的配信パスを崩さない。
+- WebSocket message schema は `app/main.py` と常に同期させる。
+
+## PWA
+- `manifest.webmanifest` と `service-worker.js` を `app/main.py` で明示的に提供。
+- PWA 関連のパスや headers を変更する場合は、フロントとバックの両方を合わせて更新する。
 
 ## Documentation
 - 実運用中の主要ドキュメントは `docs/workshop_ja.md`。
